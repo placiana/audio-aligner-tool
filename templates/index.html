@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio-to-Text Aligner</title>
+    <title>Audio Aligner | Neumorphic UI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
     <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
@@ -11,90 +14,100 @@
 <body>
     <div id="app">
         <header>
-            <h1>Audio Aligner</h1>
-            <div id="nav-controls">
-                <a href="/" class="button-link">Back to List</a>
+            <div class="header-left">
+                <h1>Toba Aligner</h1>
+                <div id="nav-controls">
+                    <a href="/" class="neumorphic-button button-link">Back to List</a>
+                </div>
             </div>
+            
             {% if selected_config %}
             <div id="progress-container">
                 <div id="progress-bar"></div>
                 <span id="progress-text">0%</span>
             </div>
-            <div class="header-actions">
-                <button id="reset-seg-btn" class="danger-btn" style="display: none;">Reset Segmentation</button>
-                <button id="save-btn">Save Progress</button>
+            
+            <div class="header-right">
+                <div class="header-actions">
+                    <button id="reset-seg-btn" class="neumorphic-button danger-btn" style="display: none;">Reset</button>
+                    <button id="save-btn" class="neumorphic-button">Save</button>
+                </div>
             </div>
             {% endif %}
         </header>
 
         {% if not selected_config %}
-        <div class="welcome">
+        <div class="welcome neumorphic-card">
             <h2>Select audio to process</h2>
             <div class="project-list">
                 {% for p in projects %}
-                <div class="project-item {{ 'completed' if p.progress == 100 }}">
+                <div class="project-item">
                     <div class="project-info">
-                        <strong>{{ p.audio_path }}</strong>
-                        <span>{{ p.completed_count }} / {{ p.total_count }} segments</span>
+                        <strong>{{ p.audio_path.split('/')[-1] }}</strong>
+                        <span>{{ p.completed_count }} / {{ p.total_count }} segments aligned</span>
                     </div>
                     <div class="project-progress-mini">
                         <div class="mini-bar" style="width: {{ p.progress }}%"></div>
-                        <span class="mini-text">{{ p.progress }}%</span>
                     </div>
-                    <a href="/?p={{ p.idx }}" class="select-btn">Open</a>
+                    <a href="/?p={{ p.idx }}" class="neumorphic-button">Open</a>
                 </div>
                 {% endfor %}
             </div>
         </div>
         {% else %}
         <!-- Stage 1: Segmentation -->
-        <div id="stage1" class="stage">
+        <div id="stage1" class="stage neumorphic-card">
             <h2>Stage 1: Segmentation</h2>
             <div class="audio-metadata">
-                <span>Current: <strong>{{ selected_config.audio_path }}</strong></span>
-                <span>Total Duration: <strong id="total-duration">0:00</strong></span>
+                <span>File: {{ selected_config.audio_path.split('/')[-1] }}</span>
+                <span>Duration: <span id="total-duration">--:--</span></span>
             </div>
             <div id="waveform-full"></div>
-            <div class="controls segmentation-settings">
+            <div class="segmentation-settings">
                 <div class="input-group">
-                    <label for="target-duration-input">Target segment duration (s):</label>
-                    <input type="number" id="target-duration-input" value="25" min="5" max="120">
+                    <label>Target (s):</label>
+                    <input type="number" id="target-duration-input" class="neumorphic-input" value="25" min="5" max="120">
                 </div>
-                <button id="detect-btn">Detect Segments</button>
+                <button id="detect-btn" class="neumorphic-button">Detect Segments</button>
                 <div id="segmentation-loader" class="loader" style="display: none;"></div>
-                <button id="confirm-segments-btn">Confirm Segments & Move to Alignment</button>
+                <button id="confirm-segments-btn" class="neumorphic-button">Confirm & Align</button>
             </div>
         </div>
 
         <!-- Stage 2: Alignment -->
-        <div id="stage2" class="stage" style="display: none;">
+        <div id="stage2" class="stage">
             <div class="split-layout">
-                <div class="left-panel">
+                <div class="left-panel neumorphic-card">
                     <h3>Current Segment</h3>
                     <div id="waveform-segment"></div>
                     <div id="segment-info">
-                        Duración: <span id="segment-duration">0.00</span>s
+                        Duration: <span id="segment-duration">0.00</span>s
                     </div>
                     <div class="segment-controls">
-                        <button id="play-segment-btn">Play/Pause (Space)</button>
+                        <button id="play-segment-btn" class="neumorphic-button">Play/Pause</button>
                         <div class="speed-controls">
-                            <button class="speed-btn active" data-speed="1">1x</button>
-                            <button class="speed-btn" data-speed="1.5">1.5x</button>
-                            <button class="speed-btn" data-speed="2">2x</button>
+                            <button class="neumorphic-button speed-btn active" data-speed="1">1x</button>
+                            <button class="neumorphic-button speed-btn" data-speed="1.5">1.5x</button>
+                            <button class="neumorphic-button speed-btn" data-speed="2">2x</button>
                         </div>
-                        <p>Segment <span id="current-segment-idx">0</span> of <span id="total-segments">0</span></p>
-                        <button id="prev-btn">Previous</button>
-                        <button id="next-btn">Next</button>
+                        <p style="font-size: 0.9em; margin: 0 10px;">
+                            Seg. <span id="current-segment-idx">0</span> / <span id="total-segments">0</span>
+                        </p>
+                    </div>
+                    <div class="navigation-controls">
+                        <button id="prev-btn" class="neumorphic-button nav-large">Previous</button>
+                        <button id="next-btn" class="neumorphic-button nav-large">Next</button>
                     </div>
                 </div>
-                <div class="right-panel">
+                <div class="right-panel neumorphic-card">
                     <h3>Transcription</h3>
                     <div id="text-container" class="text-editor">
                         <!-- Full text will be loaded here -->
                     </div>
-                    <div class="alignment-actions">
-                        <p class="hint">Highlight text and press <strong>Ctrl + Enter</strong> to assign.</p>
-                        <button id="assign-btn">Assign Highlighted Text</button>
+                    <div class="alignment-actions" style="margin-top: 20px;">
+                        <button id="assign-btn" class="neumorphic-button" style="width: 100%; border-radius: 20px;">
+                            Assign Highlight (Ctrl + Enter)
+                        </button>
                     </div>
                 </div>
             </div>
@@ -103,7 +116,6 @@
     </div>
 
     <script>
-        // Initial state from backend
         const initialState = {{ state | tojson | safe if state else 'null' }};
         const config = {{ selected_config | tojson | safe if selected_config else 'null' }};
     </script>

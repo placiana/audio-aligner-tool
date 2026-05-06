@@ -87,70 +87,70 @@
     },
     "audio/00002_GEN_2.mp3": {
         "audio_path": "audio/00002_GEN_2.mp3",
-        "text_path": "texts/GEN_2.txt",
+        "current_idx": 0,
         "segments": [
             {
                 "end": 37.8785,
-                "start": 4.29901017750707,
-                "text": "",
-                "id": "seg-0"
+                "id": "seg-0",
+                "start": 0,
+                "text": "Qaq 'era da 'eetec, da ime na piguem qataq ana 'alhua, qataq 'enauac na huetalecpi naamaye.\n\nQaq co'ollaq ivita so na'a'q siete, nache \u00d1im Lo'onatac 'Enauacna, imat nam lo'onatacpi nache nmatec.\n\nNache \u00d1im Lo'onatac 'Enauacna \u1ef9aalec da no'on la'aqtac se'eso na'a'q siete, qataq i\u1ef9otauga da yaqto' qa\u1ef9o'oxoren \u00d1imaye, cha'aye se'eso na'a'q huetoigui da nmateeguesop 'enauac na lo'onatacpi.\n\nQaq 'era da na'aqtaguec co'ollaq \u00d1im Lo'onatac 'Enauacna, \u1ef9o'ot na piguem qataq ana 'alhua."
             },
             {
                 "end": 65.11,
+                "id": "seg-1",
                 "start": 37.8785,
-                "text": "",
-                "id": "seg-1"
+                "text": ""
             },
             {
                 "end": 92.1905,
+                "id": "seg-2",
                 "start": 65.11,
-                "text": "",
-                "id": "seg-2"
+                "text": ""
             },
             {
                 "end": 135.415,
+                "id": "seg-3",
                 "start": 92.1905,
-                "text": "",
-                "id": "seg-3"
+                "text": ""
             },
             {
                 "end": 163.239,
+                "id": "seg-4",
                 "start": 135.415,
-                "text": "",
-                "id": "seg-4"
+                "text": ""
             },
             {
                 "end": 198.477,
+                "id": "seg-5",
                 "start": 163.239,
-                "text": "",
-                "id": "seg-5"
+                "text": ""
             },
             {
                 "end": 226.8235,
+                "id": "seg-6",
                 "start": 198.477,
-                "text": "",
-                "id": "seg-6"
+                "text": ""
             },
             {
                 "end": 251.971,
+                "id": "seg-7",
                 "start": 226.8235,
-                "text": "",
-                "id": "seg-7"
+                "text": ""
             },
             {
                 "end": 282.202,
+                "id": "seg-8",
                 "start": 251.971,
-                "text": "",
-                "id": "seg-8"
+                "text": ""
             },
             {
                 "end": 283.32,
+                "id": "seg-9",
                 "start": 282.202,
-                "text": "",
-                "id": "seg-9"
+                "text": ""
             }
         ],
-        "current_idx": 0,
-        "stage": 2
+        "stage": 2,
+        "text_path": "texts/GEN_2.txt"
     }
 }
