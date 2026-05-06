@@ -1,0 +1,9 @@
+[{
+    "audio_path": "audio/00001_GEN_1.mp3",
+    "text_path": "texts/GEN_1.txt"
+},
+{
+    "audio_path": "audio/00002_GEN_2.mp3",
+    "text_path": "texts/GEN_2.txt"
+}
+]
