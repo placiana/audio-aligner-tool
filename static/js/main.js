@@ -9,6 +9,8 @@ let currentState = initialState || {
 };
 
 let currentSpeed = 1;
+let previewAudio = null;
+let currentPlayingBtn = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     initStage();
@@ -163,31 +165,123 @@ async function loadTranscription() {
 }
 
 function renderTranscription() {
-    let text = originalTranscription;
+    const container = document.getElementById('text-container');
+    if (!container) return;
     
-    // Remove text assigned to OTHER segments
-    currentState.segments.forEach((seg, i) => {
-        if (i !== currentState.current_idx && seg.text) {
-            // Replace first occurrence of the assigned text with an empty string
-            // to handle duplicates correctly if they align in order.
-            text = text.replace(seg.text, "");
+    container.style.display = 'block';
+    container.style.padding = '25px';
+    container.innerHTML = '';
+    
+    const escapeHtml = (str) => {
+        return str
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    };
+
+    // Calculate the absolute character ranges of already aligned segments
+    let lastIdx = 0;
+    const ranges = currentState.segments.map((seg, i) => {
+        if (!seg.text) return null;
+        let found = originalTranscription.indexOf(seg.text, lastIdx);
+        if (found === -1) {
+            found = originalTranscription.indexOf(seg.text);
         }
+        if (found !== -1) {
+            lastIdx = found + seg.text.length;
+            return {
+                index: i,
+                start: found,
+                end: found + seg.text.length,
+                text: seg.text
+            };
+        }
+        return null;
     });
 
-    const container = document.getElementById('text-container');
-    container.innerText = text;
+    // Filter nulls and sort by start index
+    const activeRanges = ranges.filter(r => r !== null).sort((a, b) => a.start - b.start);
+
+    let html = "";
+    let currentPos = 0;
+
+    activeRanges.forEach(r => {
+        // Unaligned gap before this segment
+        if (r.start > currentPos) {
+            const unalignedText = originalTranscription.substring(currentPos, r.start);
+            html += `<span>${escapeHtml(unalignedText)}</span>`;
+        }
+        
+        // Highlighted segment
+        const segmentText = originalTranscription.substring(r.start, r.end);
+        const isActive = (r.index === currentState.current_idx);
+        const highlightClass = isActive ? 'inline-highlight active' : 'inline-highlight aligned';
+        const labelBadge = isActive ? 'Este Seg.' : `Seg. ${r.index + 1}`;
+        
+        html += `<span class="${highlightClass}" data-idx="${r.index}" title="${labelBadge}">${escapeHtml(segmentText)}</span>`;
+        
+        currentPos = r.end;
+    });
+
+    // Unaligned remaining text at the end
+    if (currentPos < originalTranscription.length) {
+        const unalignedText = originalTranscription.substring(currentPos);
+        html += `<span>${escapeHtml(unalignedText)}</span>`;
+    }
+
+    container.innerHTML = html;
+
+    // Attach click listeners to jump to segments directly when clicking highlighted spans
+    const spans = container.querySelectorAll('.inline-highlight');
+    spans.forEach(span => {
+        span.addEventListener('click', (e) => {
+            // Prevent interference with text selection dragging
+            if (window.getSelection().toString().trim().length > 0) return;
+            
+            const idx = parseInt(span.dataset.idx);
+            if (idx !== currentState.current_idx) {
+                jumpToSegment(idx);
+            }
+        });
+    });
     
     // Update metadata
     document.getElementById('current-segment-idx').innerText = currentState.current_idx + 1;
     const seg = currentState.segments[currentState.current_idx];
     document.getElementById('segment-duration').innerText = (seg.end - seg.start).toFixed(2);
+    
+    // Update dynamic Assign button label
+    const assignBtn = document.getElementById('assign-btn');
+    if (assignBtn) {
+        const currentText = currentState.segments[currentState.current_idx].text;
+        if (currentText) {
+            assignBtn.innerText = 'Siguiente Segmento (Ctrl + Enter)';
+            assignBtn.disabled = false;
+            assignBtn.style.opacity = '1';
+            assignBtn.style.cursor = 'pointer';
+        } else {
+            assignBtn.innerText = 'Selecciona texto arriba y asigna';
+            assignBtn.disabled = false;
+            assignBtn.style.opacity = '1';
+            assignBtn.style.cursor = 'pointer';
+        }
+    }
+    
+    // Scroll active span into view smoothly
+    setTimeout(() => {
+        const activeSpan = container.querySelector('.inline-highlight.active');
+        if (activeSpan) {
+            activeSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 100);
 }
 
 function updateSegmentUI() {
     renderTranscription();
 
     const seg = currentState.segments[currentState.current_idx];
-    // Reload the waveform with the new segment slice
     const segmentUrl = `/api/get_segment_audio?path=${currentState.audio_path}&start=${seg.start}&end=${seg.end}`;
     if (wsSegment) {
         wsSegment.load(segmentUrl);
@@ -195,11 +289,29 @@ function updateSegmentUI() {
 }
 
 function assignText() {
-    const selection = window.getSelection().toString();
+    const selection = window.getSelection().toString().trim();
     if (selection) {
         currentState.segments[currentState.current_idx].text = selection;
         saveState();
-        nextSegment();
+        
+        if (currentState.current_idx === currentState.segments.length - 1) {
+            updateProgress();
+            openCompletionModal();
+        } else {
+            nextSegment();
+        }
+    } else {
+        const currentText = currentState.segments[currentState.current_idx].text;
+        if (currentText) {
+            if (currentState.current_idx === currentState.segments.length - 1) {
+                updateProgress();
+                openCompletionModal();
+            } else {
+                nextSegment();
+            }
+        } else {
+            alert("Por favor, selecciona con el ratón el texto correspondiente a este segmento en el panel superior.");
+        }
     }
 }
 
@@ -255,6 +367,24 @@ function setupEventListeners() {
     document.getElementById('next-btn')?.addEventListener('click', nextSegment);
     document.getElementById('assign-btn')?.addEventListener('click', assignText);
     document.getElementById('save-btn')?.addEventListener('click', saveState);
+    document.getElementById('show-alignments-btn')?.addEventListener('click', openAlignmentsModal);
+    document.getElementById('close-modal-btn')?.addEventListener('click', closeAlignmentsModal);
+    
+    // Completion modal listeners
+    document.getElementById('close-completion-btn')?.addEventListener('click', closeCompletionModal);
+    document.getElementById('completion-review-btn')?.addEventListener('click', closeCompletionModal);
+    
+    // Close modals on clicking outside
+    window.addEventListener('click', (e) => {
+        const modal = document.getElementById('alignments-modal');
+        if (e.target === modal) {
+            closeAlignmentsModal();
+        }
+        const compModal = document.getElementById('completion-modal');
+        if (e.target === compModal) {
+            closeCompletionModal();
+        }
+    });
 
     document.getElementById('reset-seg-btn')?.addEventListener('click', () => {
         const confirmReset = confirm("¿Estás seguro de que quieres volver a la segmentación? Se perderá todo el texto asignado a los segmentos actuales.");
@@ -283,6 +413,10 @@ function setupEventListeners() {
     });
 
     window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeAlignmentsModal();
+            closeCompletionModal();
+        }
         if (currentState.stage === 2) {
             if (e.code === 'Space' && e.target.tagName !== 'TEXTAREA') {
                 e.preventDefault();
@@ -294,4 +428,361 @@ function setupEventListeners() {
             }
         }
     });
+}
+
+function openAlignmentsModal() {
+    const modal = document.getElementById('alignments-modal');
+    if (!modal) return;
+    
+    modal.style.display = 'flex';
+    renderAlignmentsOverview();
+}
+
+function closeAlignmentsModal() {
+    const modal = document.getElementById('alignments-modal');
+    if (!modal) return;
+    
+    modal.style.display = 'none';
+    
+    // Pause any preview audio that is playing
+    if (previewAudio) {
+        previewAudio.pause();
+        previewAudio = null;
+        currentPlayingBtn = null;
+    }
+}
+
+function renderAlignmentsOverview() {
+    const body = document.getElementById('modal-alignments-body');
+    if (!body) return;
+    
+    body.innerHTML = '';
+    
+    let lastIndex = 0;
+    const blocks = [];
+    
+    currentState.segments.forEach((seg, i) => {
+        if (seg.text) {
+            let foundIndex = originalTranscription.indexOf(seg.text, lastIndex);
+            
+            if (foundIndex === -1) {
+                foundIndex = originalTranscription.indexOf(seg.text);
+            }
+            
+            if (foundIndex !== -1) {
+                if (foundIndex > lastIndex) {
+                    blocks.push({
+                        type: 'unaligned',
+                        text: originalTranscription.substring(lastIndex, foundIndex)
+                    });
+                }
+                blocks.push({
+                    type: 'aligned',
+                    index: i,
+                    start: seg.start,
+                    end: seg.end,
+                    text: seg.text
+                });
+                lastIndex = foundIndex + seg.text.length;
+            } else {
+                blocks.push({
+                    type: 'aligned',
+                    index: i,
+                    start: seg.start,
+                    end: seg.end,
+                    text: seg.text,
+                    orphan: true
+                });
+            }
+        }
+    });
+    
+    if (lastIndex < originalTranscription.length) {
+        blocks.push({
+            type: 'unaligned',
+            text: originalTranscription.substring(lastIndex)
+        });
+    }
+    
+    if (blocks.length === 0) {
+        body.innerHTML = '<div style="text-align: center; padding: 40px; font-weight: 800; font-size: 1.2rem;">No hay segmentos alineados todavía. ¡Comienza a alinear la transcripción!</div>';
+        return;
+    }
+    
+    const listContainer = document.createElement('div');
+    listContainer.className = 'alignments-list';
+    
+    blocks.forEach(block => {
+        const blockEl = document.createElement('div');
+        
+        if (block.type === 'aligned') {
+            blockEl.className = 'alignment-block aligned';
+            
+            const headerEl = document.createElement('div');
+            headerEl.className = 'block-header';
+            
+            const badgeEl = document.createElement('span');
+            badgeEl.className = 'block-badge';
+            badgeEl.innerText = `Segmento ${block.index + 1} (${block.start.toFixed(2)}s - ${block.end.toFixed(2)}s)`;
+            headerEl.appendChild(badgeEl);
+            
+            const actionsEl = document.createElement('div');
+            actionsEl.className = 'block-actions';
+            
+            const playBtn = document.createElement('button');
+            playBtn.className = 'brutalist-button block-btn';
+            playBtn.innerText = '▶ Escuchar';
+            playBtn.addEventListener('click', () => {
+                playSegmentPreview(block.start, block.end, playBtn);
+            });
+            actionsEl.appendChild(playBtn);
+            
+            const jumpBtn = document.createElement('button');
+            jumpBtn.className = 'brutalist-button block-btn secondary-btn';
+            jumpBtn.innerText = 'Ir a segmento';
+            jumpBtn.addEventListener('click', () => {
+                jumpToSegment(block.index);
+            });
+            actionsEl.appendChild(jumpBtn);
+            
+            headerEl.appendChild(actionsEl);
+            blockEl.appendChild(headerEl);
+            
+            const textEl = document.createElement('div');
+            textEl.className = 'block-text';
+            textEl.innerText = block.text;
+            blockEl.appendChild(textEl);
+            
+        } else {
+            blockEl.className = 'alignment-block unaligned';
+            
+            const headerEl = document.createElement('div');
+            headerEl.className = 'block-header';
+            
+            const badgeEl = document.createElement('span');
+            badgeEl.className = 'block-badge unaligned-badge';
+            badgeEl.innerText = 'Texto Restante';
+            headerEl.appendChild(badgeEl);
+            
+            blockEl.appendChild(headerEl);
+            
+            const textEl = document.createElement('div');
+            textEl.className = 'block-text';
+            textEl.innerText = block.text.trim();
+            
+            // Only add if it's not just whitespace
+            if (textEl.innerText.length > 0) {
+                blockEl.appendChild(textEl);
+            } else {
+                return; // Skip empty unaligned blocks
+            }
+        }
+        
+        listContainer.appendChild(blockEl);
+    });
+    
+    body.appendChild(listContainer);
+}
+
+function playSegmentPreview(start, end, btn) {
+    if (previewAudio && !previewAudio.paused) {
+        previewAudio.pause();
+        if (currentPlayingBtn) {
+            currentPlayingBtn.innerText = '▶ Escuchar';
+        }
+        
+        if (currentPlayingBtn === btn) {
+            previewAudio = null;
+            currentPlayingBtn = null;
+            return;
+        }
+    }
+    
+    const url = `/api/get_segment_audio?path=${currentState.audio_path}&start=${start}&end=${end}`;
+    previewAudio = new Audio(url);
+    currentPlayingBtn = btn;
+    btn.innerText = '⏸ Pausa';
+    
+    previewAudio.play();
+    previewAudio.onended = () => {
+        btn.innerText = '▶ Escuchar';
+        previewAudio = null;
+        currentPlayingBtn = null;
+    };
+}
+
+function jumpToSegment(idx) {
+    if (previewAudio) {
+        previewAudio.pause();
+        previewAudio = null;
+        currentPlayingBtn = null;
+    }
+    currentState.current_idx = idx;
+    updateSegmentUI();
+    updateProgress();
+    closeAlignmentsModal();
+}
+
+function openCompletionModal() {
+    const modal = document.getElementById('completion-modal');
+    if (!modal) return;
+    
+    if (previewAudio) {
+        previewAudio.pause();
+        previewAudio = null;
+        if (currentPlayingBtn) {
+            currentPlayingBtn.innerText = '▶ Escuchar';
+            currentPlayingBtn = null;
+        }
+    }
+    
+    renderCompletionOverview();
+    modal.style.display = 'flex';
+}
+
+function closeCompletionModal() {
+    const modal = document.getElementById('completion-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    if (previewAudio) {
+        previewAudio.pause();
+        previewAudio = null;
+        if (currentPlayingBtn) {
+            currentPlayingBtn.innerText = '▶ Escuchar';
+            currentPlayingBtn = null;
+        }
+    }
+}
+
+function renderCompletionOverview() {
+    const body = document.getElementById('completion-alignments-body');
+    if (!body) return;
+    
+    body.innerHTML = '';
+    
+    let lastIndex = 0;
+    const blocks = [];
+    
+    currentState.segments.forEach((seg, i) => {
+        if (seg.text) {
+            let foundIndex = originalTranscription.indexOf(seg.text, lastIndex);
+            
+            if (foundIndex === -1) {
+                foundIndex = originalTranscription.indexOf(seg.text);
+            }
+            
+            if (foundIndex !== -1) {
+                if (foundIndex > lastIndex) {
+                    blocks.push({
+                        type: 'unaligned',
+                        text: originalTranscription.substring(lastIndex, foundIndex)
+                    });
+                }
+                blocks.push({
+                    type: 'aligned',
+                    index: i,
+                    start: seg.start,
+                    end: seg.end,
+                    text: seg.text
+                });
+                lastIndex = foundIndex + seg.text.length;
+            } else {
+                blocks.push({
+                    type: 'aligned',
+                    index: i,
+                    start: seg.start,
+                    end: seg.end,
+                    text: seg.text,
+                    orphan: true
+                });
+            }
+        }
+    });
+    
+    if (lastIndex < originalTranscription.length) {
+        blocks.push({
+            type: 'unaligned',
+            text: originalTranscription.substring(lastIndex)
+        });
+    }
+    
+    if (blocks.length === 0) {
+        body.innerHTML = '<div style="text-align: center; padding: 40px; font-weight: 800; font-size: 1.2rem;">No hay segmentos alineados todavía.</div>';
+        return;
+    }
+    
+    const listContainer = document.createElement('div');
+    listContainer.className = 'alignments-list';
+    
+    blocks.forEach(block => {
+        const blockEl = document.createElement('div');
+        
+        if (block.type === 'aligned') {
+            blockEl.className = 'alignment-block aligned';
+            
+            const headerEl = document.createElement('div');
+            headerEl.className = 'block-header';
+            
+            const badgeEl = document.createElement('span');
+            badgeEl.className = 'block-badge';
+            badgeEl.innerText = `Segmento ${block.index + 1} (${block.start.toFixed(2)}s - ${block.end.toFixed(2)}s)`;
+            headerEl.appendChild(badgeEl);
+            
+            const actionsEl = document.createElement('div');
+            actionsEl.className = 'block-actions';
+            
+            const playBtn = document.createElement('button');
+            playBtn.className = 'brutalist-button block-btn';
+            playBtn.innerText = '▶ Escuchar';
+            playBtn.addEventListener('click', () => {
+                playSegmentPreview(block.start, block.end, playBtn);
+            });
+            actionsEl.appendChild(playBtn);
+            
+            const jumpBtn = document.createElement('button');
+            jumpBtn.className = 'brutalist-button block-btn secondary-btn';
+            jumpBtn.innerText = 'Corregir';
+            jumpBtn.addEventListener('click', () => {
+                closeCompletionModal();
+                jumpToSegment(block.index);
+            });
+            actionsEl.appendChild(jumpBtn);
+            
+            headerEl.appendChild(actionsEl);
+            blockEl.appendChild(headerEl);
+            
+            const textEl = document.createElement('div');
+            textEl.className = 'block-text';
+            textEl.innerText = block.text;
+            blockEl.appendChild(textEl);
+            
+        } else {
+            blockEl.className = 'alignment-block unaligned';
+            
+            const headerEl = document.createElement('div');
+            headerEl.className = 'block-header';
+            
+            const badgeEl = document.createElement('span');
+            badgeEl.className = 'block-badge unaligned-badge';
+            badgeEl.innerText = 'Texto Restante';
+            headerEl.appendChild(badgeEl);
+            
+            blockEl.appendChild(headerEl);
+            
+            const textEl = document.createElement('div');
+            textEl.className = 'block-text';
+            textEl.innerText = block.text.trim();
+            
+            if (textEl.innerText.length > 0) {
+                blockEl.appendChild(textEl);
+            } else {
+                return;
+            }
+        }
+        
+        listContainer.appendChild(blockEl);
+    });
+    
+    body.appendChild(listContainer);
 }

@@ -157,6 +157,16 @@ def detect_segments():
         
     return jsonify({"segments": segments})
 
+@app.route('/api/download_database')
+def download_database():
+    if os.path.exists(STATE_FILE):
+        return send_file(STATE_FILE, as_attachment=True, download_name='state.json')
+    else:
+        buffer = BytesIO()
+        buffer.write(b"{}")
+        buffer.seek(0)
+        return send_file(buffer, mimetype="application/json", as_attachment=True, download_name='state.json')
+
 @app.route('/api/save_state', methods=['POST'])
 def save_state_api():
     data = request.json

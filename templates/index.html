@@ -1,44 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Aligner | Neumorphic UI</title>
+    <title>Audio Aligner</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
     <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
 </head>
+
 <body>
     <div id="app">
         <header>
             <div class="header-left">
-                <h1>Toba Aligner</h1>
+                <h1>Audio Aligner</h1>
                 <div id="nav-controls">
-                    <a href="/" class="neumorphic-button button-link">Back to List</a>
+                    <a href="/" class="brutalist-button button-link">Back to List</a>
                 </div>
             </div>
-            
+
             {% if selected_config %}
             <div id="progress-container">
                 <div id="progress-bar"></div>
                 <span id="progress-text">0%</span>
             </div>
-            
+
             <div class="header-right">
                 <div class="header-actions">
-                    <button id="reset-seg-btn" class="neumorphic-button danger-btn" style="display: none;">Reset</button>
-                    <button id="save-btn" class="neumorphic-button">Save</button>
+                    <button id="reset-seg-btn" class="brutalist-button danger-btn" style="display: none;">Reset</button>
+                    <button id="save-btn" class="brutalist-button">Save</button>
                 </div>
             </div>
             {% endif %}
         </header>
 
         {% if not selected_config %}
-        <div class="welcome neumorphic-card">
-            <h2>Select audio to process</h2>
+        <div class="welcome brutalist-card" style="margin: 40px auto;">
+            <div class="main-actions"
+                style="margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid var(--border-color); padding-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+                <h2 style="margin: 0; font-size: 22px; font-weight: 800;">Selecciona un audio para procesar</h2>
+                <a href="/api/download_database" class="brutalist-button button-link"
+                    style="background: var(--accent-secondary); text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; box-shadow: 3px 3px 0px var(--border-color); padding: 8px 16px;">
+                    📥 Descargar Base de Datos Consolidada (JSON)
+                </a>
+            </div>
             <div class="project-list">
                 {% for p in projects %}
                 <div class="project-item">
@@ -49,14 +60,14 @@
                     <div class="project-progress-mini">
                         <div class="mini-bar" style="width: {{ p.progress }}%"></div>
                     </div>
-                    <a href="/?p={{ p.idx }}" class="neumorphic-button">Open</a>
+                    <a href="/?p={{ p.idx }}" class="brutalist-button">Open</a>
                 </div>
                 {% endfor %}
             </div>
         </div>
         {% else %}
         <!-- Stage 1: Segmentation -->
-        <div id="stage1" class="stage neumorphic-card">
+        <div id="stage1" class="stage brutalist-card">
             <h2>Stage 1: Segmentation</h2>
             <div class="audio-metadata">
                 <span>File: {{ selected_config.audio_path.split('/')[-1] }}</span>
@@ -66,48 +77,110 @@
             <div class="segmentation-settings">
                 <div class="input-group">
                     <label>Target (s):</label>
-                    <input type="number" id="target-duration-input" class="neumorphic-input" value="25" min="5" max="120">
+                    <input type="number" id="target-duration-input" class="brutalist-input" value="25" min="5"
+                        max="120">
                 </div>
-                <button id="detect-btn" class="neumorphic-button">Detect Segments</button>
+                <button id="detect-btn" class="brutalist-button">Detect Segments</button>
                 <div id="segmentation-loader" class="loader" style="display: none;"></div>
-                <button id="confirm-segments-btn" class="neumorphic-button">Confirm & Align</button>
+                <button id="confirm-segments-btn" class="brutalist-button">Confirm & Align</button>
             </div>
         </div>
 
         <!-- Stage 2: Alignment -->
         <div id="stage2" class="stage">
             <div class="split-layout">
-                <div class="left-panel neumorphic-card">
+                <div class="left-panel brutalist-card">
                     <h3>Current Segment</h3>
                     <div id="waveform-segment"></div>
                     <div id="segment-info">
                         Duration: <span id="segment-duration">0.00</span>s
                     </div>
                     <div class="segment-controls">
-                        <button id="play-segment-btn" class="neumorphic-button">Play/Pause</button>
+                        <button id="play-segment-btn" class="brutalist-button">Play/Pause</button>
                         <div class="speed-controls">
-                            <button class="neumorphic-button speed-btn active" data-speed="1">1x</button>
-                            <button class="neumorphic-button speed-btn" data-speed="1.5">1.5x</button>
-                            <button class="neumorphic-button speed-btn" data-speed="2">2x</button>
+                            <button class="brutalist-button speed-btn active" data-speed="1">1x</button>
+                            <button class="brutalist-button speed-btn" data-speed="1.5">1.5x</button>
+                            <button class="brutalist-button speed-btn" data-speed="2">2x</button>
                         </div>
                         <p style="font-size: 0.9em; margin: 0 10px;">
                             Seg. <span id="current-segment-idx">0</span> / <span id="total-segments">0</span>
                         </p>
                     </div>
                     <div class="navigation-controls">
-                        <button id="prev-btn" class="neumorphic-button nav-large">Previous</button>
-                        <button id="next-btn" class="neumorphic-button nav-large">Next</button>
+                        <button id="prev-btn" class="brutalist-button nav-large">Previous</button>
+                        <button id="next-btn" class="brutalist-button nav-large">Next</button>
                     </div>
                 </div>
-                <div class="right-panel neumorphic-card">
-                    <h3>Transcription</h3>
+                <div class="right-panel brutalist-card">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0;">Transcription</h3>
+                        <button id="show-alignments-btn" class="brutalist-button secondary-btn"
+                            style="padding: 6px 12px; font-size: 12px; box-shadow: 2px 2px 0px var(--border-color);">
+                            Ver Alineamientos
+                        </button>
+                    </div>
                     <div id="text-container" class="text-editor">
                         <!-- Full text will be loaded here -->
                     </div>
                     <div class="alignment-actions" style="margin-top: 20px;">
-                        <button id="assign-btn" class="neumorphic-button" style="width: 100%; border-radius: 20px;">
+                        <button id="assign-btn" class="brutalist-button" style="width: 100%; border-radius: 20px;">
                             Assign Highlight (Ctrl + Enter)
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for Alignments Overview -->
+        <div id="alignments-modal" class="brutalist-modal" style="display: none;">
+            <div class="brutalist-modal-content brutalist-card">
+                <div class="modal-header">
+                    <h2>Alineamientos Realizados</h2>
+                    <button id="close-modal-btn" class="brutalist-button danger-btn modal-close-x">✕</button>
+                </div>
+                <div class="modal-body" id="modal-alignments-body">
+                    <!-- Alignments blocks will be dynamically rendered here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for Completion Screen -->
+        <div id="completion-modal" class="brutalist-modal" style="display: none;">
+            <div class="brutalist-modal-content brutalist-card"
+                style="max-width: 800px; height: 90vh; max-height: 90vh;">
+                <div class="modal-header" style="background: var(--accent-secondary);">
+                    <h2 style="margin: 0; font-size: 24px;">🎉 ¡AUDIO ALINEADO CON ÉXITO!</h2>
+                    <button id="close-completion-btn" class="brutalist-button danger-btn modal-close-x">✕</button>
+                </div>
+                <div class="modal-body"
+                    style="display: flex; flex-direction: column; gap: 20px; overflow-y: auto; padding: 25px;">
+                    <div class="brutalist-card"
+                        style="background: white; border: 2.5px solid var(--border-color); padding: 20px; box-shadow: 4px 4px 0px var(--border-color); text-align: center;">
+                        <h3 style="margin-top: 0; font-size: 20px; color: var(--text-color);">¡Excelente trabajo! Has
+                            completado la alineación de este audio.</h3>
+                        <p style="font-size: 16px; margin: 10px 0 20px 0; color: #555;">Revisa a continuación cada uno
+                            de los segmentos alineados, escucha las pistas previas para verificar la sincronización o
+                            vuelve al listado para procesar un nuevo archivo.</p>
+
+                        <div class="completion-actions"
+                            style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+                            <a href="/" class="brutalist-button button-link"
+                                style="background: var(--accent-color); padding: 10px 20px; font-weight: 800; text-decoration: none; box-shadow: 4px 4px 0px var(--border-color);">
+                                🏠 Volver al Listado Principal
+                            </a>
+                            <button id="completion-review-btn" class="brutalist-button"
+                                style="background: white; padding: 10px 20px; font-weight: 800; box-shadow: 4px 4px 0px var(--border-color);">
+                                🔍 Volver al Editor
+                            </button>
+                        </div>
+                    </div>
+
+                    <h3 style="margin: 10px 0 0 0; font-size: 18px; text-transform: uppercase;">Vista Previa de
+                        Alineamientos</h3>
+                    <div id="completion-alignments-body" class="alignments-list"
+                        style="display: flex; flex-direction: column; gap: 15px;">
+                        <!-- Aligned segment review cards will be rendered here dynamically -->
                     </div>
                 </div>
             </div>
@@ -123,4 +196,5 @@
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% endif %}
 </body>
+
 </html>
