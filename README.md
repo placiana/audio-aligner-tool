@@ -1,6 +1,6 @@
 # Audio Aligner
 
-A semi-automated tool for aligning Toba Bible audio recordings with their corresponding text transcriptions. This project facilitates the creation of time-aligned text for applications like synchronized highlighting during audio playback.
+A semi-automated tool for aligning audio recordings with their corresponding text transcriptions. This project facilitates the creation of time-aligned text for applications like synchronized highlighting during audio playback.
 
 ## Preview
 
