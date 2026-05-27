@@ -19,9 +19,9 @@
     <div id="app">
         <header>
             <div class="header-left">
-                <h1>Audio Aligner</h1>
+                <h1 data-i18n="title">Audio Aligner</h1>
                 <div id="nav-controls">
-                    <a href="/" class="brutalist-button button-link">Back to List</a>
+                    <a href="/" class="brutalist-button button-link" data-i18n="back_to_list">Back to List</a>
                 </div>
             </div>
 
@@ -30,24 +30,27 @@
                 <div id="progress-bar"></div>
                 <span id="progress-text">0%</span>
             </div>
+            {% endif %}
 
             <div class="header-right">
-                <div class="header-actions">
-                    <button id="reset-seg-btn" class="brutalist-button danger-btn" style="display: none;">Reset</button>
-                    <button id="save-btn" class="brutalist-button">Save</button>
+                <div class="header-actions" style="display: flex; gap: 10px; align-items: center;">
+                    <button id="lang-toggle-btn" class="brutalist-button secondary-btn" style="padding: 8px 16px; font-weight: 800; font-size: 13px; box-shadow: 2px 2px 0px var(--border-color);">🌐 EN</button>
+                    {% if selected_config %}
+                    <button id="reset-seg-btn" class="brutalist-button danger-btn" style="display: none;" data-i18n="reset_btn">Reset</button>
+                    <button id="save-btn" class="brutalist-button" data-i18n="save_btn">Save</button>
+                    {% endif %}
                 </div>
             </div>
-            {% endif %}
         </header>
 
         {% if not selected_config %}
         <div class="welcome brutalist-card" style="margin: 40px auto;">
             <div class="main-actions"
                 style="margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid var(--border-color); padding-bottom: 20px; flex-wrap: wrap; gap: 15px;">
-                <h2 style="margin: 0; font-size: 22px; font-weight: 800;">Selecciona un audio para procesar</h2>
-                <a href="/api/download_database" class="brutalist-button button-link"
+                <h2 style="margin: 0; font-size: 22px; font-weight: 800;" data-i18n="welcome_title">Select an audio to process</h2>
+                <a href="/api/download_database" class="brutalist-button button-link" id="download-db-btn" data-i18n="download_db"
                     style="background: var(--accent-secondary); text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; box-shadow: 3px 3px 0px var(--border-color); padding: 8px 16px;">
-                    📥 Descargar Base de Datos Consolidada (JSON)
+                    📥 Download Consolidated Database (JSON)
                 </a>
             </div>
             <div class="project-list">
@@ -55,12 +58,12 @@
                 <div class="project-item">
                     <div class="project-info">
                         <strong>{{ p.audio_path.split('/')[-1] }}</strong>
-                        <span>{{ p.completed_count }} / {{ p.total_count }} segments aligned</span>
+                        <span class="project-segments-status" data-completed="{{ p.completed_count }}" data-total="{{ p.total_count }}">{{ p.completed_count }} / {{ p.total_count }} segments aligned</span>
                     </div>
                     <div class="project-progress-mini">
                         <div class="mini-bar" style="width: {{ p.progress }}%"></div>
                     </div>
-                    <a href="/?p={{ p.idx }}" class="brutalist-button">Open</a>
+                    <a href="/?p={{ p.idx }}" class="brutalist-button" data-i18n="open_btn">Open</a>
                 </div>
                 {% endfor %}
             </div>
@@ -68,21 +71,21 @@
         {% else %}
         <!-- Stage 1: Segmentation -->
         <div id="stage1" class="stage brutalist-card">
-            <h2>Stage 1: Segmentation</h2>
+            <h2 data-i18n="stage1_title">Stage 1: Segmentation</h2>
             <div class="audio-metadata">
-                <span>File: {{ selected_config.audio_path.split('/')[-1] }}</span>
-                <span>Duration: <span id="total-duration">--:--</span></span>
+                <span><span data-i18n="file_label">File:</span> {{ selected_config.audio_path.split('/')[-1] }}</span>
+                <span><span data-i18n="duration_label">Duration:</span> <span id="total-duration">--:--</span></span>
             </div>
             <div id="waveform-full"></div>
             <div class="segmentation-settings">
                 <div class="input-group">
-                    <label>Target (s):</label>
+                    <label data-i18n="target_duration">Target (s):</label>
                     <input type="number" id="target-duration-input" class="brutalist-input" value="25" min="5"
                         max="120">
                 </div>
-                <button id="detect-btn" class="brutalist-button">Detect Segments</button>
+                <button id="detect-btn" class="brutalist-button" data-i18n="detect_btn">Detect Segments</button>
                 <div id="segmentation-loader" class="loader" style="display: none;"></div>
-                <button id="confirm-segments-btn" class="brutalist-button">Confirm & Align</button>
+                <button id="confirm-segments-btn" class="brutalist-button" data-i18n="confirm_btn">Confirm & Align</button>
             </div>
         </div>
 
@@ -90,41 +93,41 @@
         <div id="stage2" class="stage">
             <div class="split-layout">
                 <div class="left-panel brutalist-card">
-                    <h3>Current Segment</h3>
+                    <h3 data-i18n="current_segment_title">Current Segment</h3>
                     <div id="waveform-segment"></div>
                     <div id="segment-info">
-                        Duration: <span id="segment-duration">0.00</span>s
+                        <span data-i18n="duration_label">Duration:</span> <span id="segment-duration">0.00</span>s
                     </div>
                     <div class="segment-controls">
-                        <button id="play-segment-btn" class="brutalist-button">Play/Pause</button>
+                        <button id="play-segment-btn" class="brutalist-button" data-i18n="play_pause">Play/Pause</button>
                         <div class="speed-controls">
                             <button class="brutalist-button speed-btn active" data-speed="1">1x</button>
                             <button class="brutalist-button speed-btn" data-speed="1.5">1.5x</button>
                             <button class="brutalist-button speed-btn" data-speed="2">2x</button>
                         </div>
                         <p style="font-size: 0.9em; margin: 0 10px;">
-                            Seg. <span id="current-segment-idx">0</span> / <span id="total-segments">0</span>
+                            <span data-i18n="seg_label">Seg.</span> <span id="current-segment-idx">0</span> / <span id="total-segments">0</span>
                         </p>
                     </div>
                     <div class="navigation-controls">
-                        <button id="prev-btn" class="brutalist-button nav-large">Previous</button>
-                        <button id="next-btn" class="brutalist-button nav-large">Next</button>
+                        <button id="prev-btn" class="brutalist-button nav-large" data-i18n="prev_btn">Previous</button>
+                        <button id="next-btn" class="brutalist-button nav-large" data-i18n="next_btn">Next</button>
                     </div>
                 </div>
                 <div class="right-panel brutalist-card">
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3 style="margin: 0;">Transcription</h3>
-                        <button id="show-alignments-btn" class="brutalist-button secondary-btn"
+                        <h3 style="margin: 0;" data-i18n="transcription_title">Transcription</h3>
+                        <button id="show-alignments-btn" class="brutalist-button secondary-btn" data-i18n="show_alignments"
                             style="padding: 6px 12px; font-size: 12px; box-shadow: 2px 2px 0px var(--border-color);">
-                            Ver Alineamientos
+                            View Alignments
                         </button>
                     </div>
                     <div id="text-container" class="text-editor">
                         <!-- Full text will be loaded here -->
                     </div>
                     <div class="alignment-actions" style="margin-top: 20px;">
-                        <button id="assign-btn" class="brutalist-button" style="width: 100%; border-radius: 20px;">
+                        <button id="assign-btn" class="brutalist-button" style="width: 100%; border-radius: 20px;" data-i18n="assign_highlight_btn">
                             Assign Highlight (Ctrl + Enter)
                         </button>
                     </div>
@@ -136,7 +139,7 @@
         <div id="alignments-modal" class="brutalist-modal" style="display: none;">
             <div class="brutalist-modal-content brutalist-card">
                 <div class="modal-header">
-                    <h2>Alineamientos Realizados</h2>
+                    <h2 data-i18n="alignments_modal_title">Created Alignments</h2>
                     <button id="close-modal-btn" class="brutalist-button danger-btn modal-close-x">✕</button>
                 </div>
                 <div class="modal-body" id="modal-alignments-body">
@@ -150,34 +153,30 @@
             <div class="brutalist-modal-content brutalist-card"
                 style="max-width: 800px; height: 90vh; max-height: 90vh;">
                 <div class="modal-header" style="background: var(--accent-secondary);">
-                    <h2 style="margin: 0; font-size: 24px;">🎉 ¡AUDIO ALINEADO CON ÉXITO!</h2>
+                    <h2 style="margin: 0; font-size: 24px;" data-i18n="completion_title">🎉 AUDIO ALIGNED SUCCESSFULLY!</h2>
                     <button id="close-completion-btn" class="brutalist-button danger-btn modal-close-x">✕</button>
                 </div>
                 <div class="modal-body"
                     style="display: flex; flex-direction: column; gap: 20px; overflow-y: auto; padding: 25px;">
                     <div class="brutalist-card"
                         style="background: white; border: 2.5px solid var(--border-color); padding: 20px; box-shadow: 4px 4px 0px var(--border-color); text-align: center;">
-                        <h3 style="margin-top: 0; font-size: 20px; color: var(--text-color);">¡Excelente trabajo! Has
-                            completado la alineación de este audio.</h3>
-                        <p style="font-size: 16px; margin: 10px 0 20px 0; color: #555;">Revisa a continuación cada uno
-                            de los segmentos alineados, escucha las pistas previas para verificar la sincronización o
-                            vuelve al listado para procesar un nuevo archivo.</p>
+                        <h3 style="margin-top: 0; font-size: 20px; color: var(--text-color);" data-i18n="completion_congrats">Excellent work! You have completed the alignment of this audio.</h3>
+                        <p style="font-size: 16px; margin: 10px 0 20px 0; color: #555;" data-i18n="completion_instructions">Review each aligned segment below, listen to the previews to verify synchronization, or return to the list to process a new file.</p>
 
                         <div class="completion-actions"
                             style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
-                            <a href="/" class="brutalist-button button-link"
+                            <a href="/" class="brutalist-button button-link" data-i18n="completion_home"
                                 style="background: var(--accent-color); padding: 10px 20px; font-weight: 800; text-decoration: none; box-shadow: 4px 4px 0px var(--border-color);">
-                                🏠 Volver al Listado Principal
+                                🏠 Return to Main List
                             </a>
-                            <button id="completion-review-btn" class="brutalist-button"
+                            <button id="completion-review-btn" class="brutalist-button" data-i18n="completion_review"
                                 style="background: white; padding: 10px 20px; font-weight: 800; box-shadow: 4px 4px 0px var(--border-color);">
-                                🔍 Volver al Editor
+                                🔍 Return to Editor
                             </button>
                         </div>
                     </div>
 
-                    <h3 style="margin: 10px 0 0 0; font-size: 18px; text-transform: uppercase;">Vista Previa de
-                        Alineamientos</h3>
+                    <h3 style="margin: 10px 0 0 0; font-size: 18px; text-transform: uppercase;" data-i18n="completion_preview_title">Alignments Preview</h3>
                     <div id="completion-alignments-body" class="alignments-list"
                         style="display: flex; flex-direction: column; gap: 15px;">
                         <!-- Aligned segment review cards will be rendered here dynamically -->
@@ -192,9 +191,7 @@
         const initialState = {{ state | tojson | safe if state else 'null' }};
         const config = {{ selected_config | tojson | safe if selected_config else 'null' }};
     </script>
-    {% if selected_config %}
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    {% endif %}
 </body>
 
 </html>

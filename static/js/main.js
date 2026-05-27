@@ -1,8 +1,8 @@
 let wsFull, wsSegment;
 let regions;
 let currentState = initialState || {
-    audio_path: config.audio_path,
-    text_path: config.text_path,
+    audio_path: config ? config.audio_path : '',
+    text_path: config ? config.text_path : '',
     segments: [],
     current_idx: 0,
     stage: 1
@@ -11,13 +11,106 @@ let currentState = initialState || {
 let currentSpeed = 1;
 let previewAudio = null;
 let currentPlayingBtn = null;
+let currentLang = localStorage.getItem('aligner_lang') || 'en';
+
+const translations = {
+    en: {
+        title: "Audio Aligner",
+        welcome_title: "Select an audio to process",
+        download_db: "📥 Download Consolidated Database (JSON)",
+        segments_aligned: "segments aligned",
+        open_btn: "Open",
+        back_to_list: "Back to List",
+        reset_btn: "Reset",
+        save_btn: "Save",
+        stage1_title: "Stage 1: Segmentation",
+        file_label: "File:",
+        duration_label: "Duration:",
+        target_duration: "Target (s):",
+        detect_btn: "Detect Segments",
+        confirm_btn: "Confirm & Align",
+        current_segment_title: "Current Segment",
+        play_pause: "Play/Pause",
+        seg_label: "Seg.",
+        prev_btn: "Previous",
+        next_btn: "Next",
+        transcription_title: "Transcription",
+        show_alignments: "View Alignments",
+        alignments_modal_title: "Created Alignments",
+        completion_title: "🎉 AUDIO ALIGNED SUCCESSFULLY!",
+        completion_congrats: "Excellent work! You have completed the alignment of this audio.",
+        completion_instructions: "Review each aligned segment below, listen to the previews to verify synchronization, or return to the list to process a new file.",
+        completion_home: "🏠 Return to Main List",
+        completion_review: "🔍 Return to Editor",
+        completion_preview_title: "Alignments Preview",
+        no_alignments_yet: "No aligned segments yet. Start aligning the transcription!",
+        listen_btn: "▶ Listen",
+        pause_btn: "⏸ Pause",
+        jump_btn: "Go to segment",
+        correct_btn: "Edit",
+        remaining_text: "Remaining Text",
+        reset_confirm: "Are you sure you want to go back to segmentation? All text assigned to the current segments will be lost.",
+        select_text_alert: "Please select the text corresponding to this segment in the panel above with your mouse.",
+        this_seg_badge: "This Seg.",
+        seg_badge_prefix: "Seg. ",
+        assign_highlight_btn: "Assign Highlight (Ctrl + Enter)",
+        next_seg_btn: "Next Segment (Ctrl + Enter)",
+        select_and_assign_btn: "Select text above and assign"
+    },
+    es: {
+        title: "Audio Aligner",
+        welcome_title: "Selecciona un audio para procesar",
+        download_db: "📥 Descargar Base de Datos Consolidada (JSON)",
+        segments_aligned: "segmentos alineados",
+        open_btn: "Abrir",
+        back_to_list: "Volver al listado",
+        reset_btn: "Reiniciar",
+        save_btn: "Guardar",
+        stage1_title: "Fase 1: Segmentación",
+        file_label: "Archivo:",
+        duration_label: "Duración:",
+        target_duration: "Duración obj. (s):",
+        detect_btn: "Detectar Segmentos",
+        confirm_btn: "Confirmar y Alinear",
+        current_segment_title: "Segmento Actual",
+        play_pause: "Reproducir/Pausa",
+        seg_label: "Seg.",
+        prev_btn: "Anterior",
+        next_btn: "Siguiente",
+        transcription_title: "Transcripción",
+        show_alignments: "Ver Alineamientos",
+        alignments_modal_title: "Alineamientos Realizados",
+        completion_title: "🎉 ¡AUDIO ALINEADO CON ÉXITO!",
+        completion_congrats: "¡Excelente trabajo! Has completado la alineación de este audio.",
+        completion_instructions: "Revisa a continuación cada uno de los segmentos alineados, escucha las pistas previas para verificar la sincronización o vuelve al listado para procesar un nuevo archivo.",
+        completion_home: "🏠 Volver al Listado Principal",
+        completion_review: "🔍 Volver al Editor",
+        completion_preview_title: "Vista Previa de Alineamientos",
+        no_alignments_yet: "No hay segmentos alineados todavía. ¡Comienza a alinear la transcripción!",
+        listen_btn: "▶ Escuchar",
+        pause_btn: "⏸ Pausa",
+        jump_btn: "Ir a segmento",
+        correct_btn: "Corregir",
+        remaining_text: "Texto Restante",
+        reset_confirm: "¿Estás seguro de que quieres volver a la segmentación? Se perderá todo el texto asignado a los segmentos actuales.",
+        select_text_alert: "Por favor, selecciona con el ratón el texto correspondiente a este segmento en el panel superior.",
+        this_seg_badge: "Este Seg.",
+        seg_badge_prefix: "Seg. ",
+        assign_highlight_btn: "Asignar Selección (Ctrl + Enter)",
+        next_seg_btn: "Siguiente Segmento (Ctrl + Enter)",
+        select_and_assign_btn: "Selecciona texto arriba y asigna"
+    }
+};
 
 document.addEventListener('DOMContentLoaded', () => {
+    currentLang = localStorage.getItem('aligner_lang') || 'en';
     initStage();
     setupEventListeners();
+    updateLanguageUI();
 });
 
 function initStage() {
+    if (!config) return;
     const resetBtn = document.getElementById('reset-seg-btn');
     if (currentState.stage === 1) {
         document.getElementById('stage1').style.display = 'block';
@@ -35,6 +128,7 @@ function initStage() {
 }
 
 function initWaveformFull() {
+    if (!config) return;
     if (wsFull) wsFull.destroy();
     
     wsFull = WaveSurfer.create({
@@ -73,6 +167,7 @@ function initWaveformFull() {
 }
 
 function renderRegions() {
+    if (!config) return;
     regions.clearRegions();
     currentState.segments.forEach((seg, i) => {
         const region = regions.addRegion({
@@ -102,6 +197,7 @@ function formatTime(seconds) {
 }
 
 async function detectSegments() {
+    if (!config) return;
     const btn = document.getElementById('detect-btn');
     const loader = document.getElementById('segmentation-loader');
     const targetDuration = parseInt(document.getElementById('target-duration-input').value) || 25;
@@ -130,6 +226,7 @@ async function detectSegments() {
 }
 
 function initWaveformSegment() {
+    if (!config) return;
     if (wsSegment) wsSegment.destroy();
     
     const seg = currentState.segments[currentState.current_idx];
@@ -156,6 +253,7 @@ function initWaveformSegment() {
 let originalTranscription = "";
 
 async function loadTranscription() {
+    if (!config) return;
     const response = await fetch(`/api/load_text?path=${currentState.text_path}`);
     const data = await response.json();
     originalTranscription = data.text;
@@ -218,7 +316,7 @@ function renderTranscription() {
         const segmentText = originalTranscription.substring(r.start, r.end);
         const isActive = (r.index === currentState.current_idx);
         const highlightClass = isActive ? 'inline-highlight active' : 'inline-highlight aligned';
-        const labelBadge = isActive ? 'Este Seg.' : `Seg. ${r.index + 1}`;
+        const labelBadge = isActive ? translations[currentLang].this_seg_badge : `${translations[currentLang].seg_badge_prefix}${r.index + 1}`;
         
         html += `<span class="${highlightClass}" data-idx="${r.index}" title="${labelBadge}">${escapeHtml(segmentText)}</span>`;
         
@@ -257,12 +355,12 @@ function renderTranscription() {
     if (assignBtn) {
         const currentText = currentState.segments[currentState.current_idx].text;
         if (currentText) {
-            assignBtn.innerText = 'Siguiente Segmento (Ctrl + Enter)';
+            assignBtn.innerText = translations[currentLang].next_seg_btn;
             assignBtn.disabled = false;
             assignBtn.style.opacity = '1';
             assignBtn.style.cursor = 'pointer';
         } else {
-            assignBtn.innerText = 'Selecciona texto arriba y asigna';
+            assignBtn.innerText = translations[currentLang].select_and_assign_btn;
             assignBtn.disabled = false;
             assignBtn.style.opacity = '1';
             assignBtn.style.cursor = 'pointer';
@@ -279,6 +377,7 @@ function renderTranscription() {
 }
 
 function updateSegmentUI() {
+    if (!config) return;
     renderTranscription();
 
     const seg = currentState.segments[currentState.current_idx];
@@ -289,6 +388,7 @@ function updateSegmentUI() {
 }
 
 function assignText() {
+    if (!config) return;
     const selection = window.getSelection().toString().trim();
     if (selection) {
         currentState.segments[currentState.current_idx].text = selection;
@@ -310,7 +410,7 @@ function assignText() {
                 nextSegment();
             }
         } else {
-            alert("Por favor, selecciona con el ratón el texto correspondiente a este segmento en el panel superior.");
+            alert(translations[currentLang].select_text_alert);
         }
     }
 }
@@ -332,6 +432,7 @@ function prevSegment() {
 }
 
 async function saveState() {
+    if (!config) return;
     await fetch('/api/save_state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -340,15 +441,22 @@ async function saveState() {
 }
 
 function updateProgress() {
+    if (!config) return;
     const total = currentState.segments.length;
     if (total === 0) return;
     const completed = currentState.segments.filter(s => s.text).length;
     const percent = Math.round((completed / total) * 100);
-    document.getElementById('progress-bar').style.width = `${percent}%`;
-    document.getElementById('progress-text').innerText = `${percent}%`;
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    if (progressBar) progressBar.style.width = `${percent}%`;
+    if (progressText) progressText.innerText = `${percent}%`;
 }
 
 function setupEventListeners() {
+    document.getElementById('lang-toggle-btn')?.addEventListener('click', toggleLanguage);
+
+    if (!config) return;
+
     document.getElementById('detect-btn')?.addEventListener('click', detectSegments);
     
     document.getElementById('confirm-segments-btn')?.addEventListener('click', () => {
@@ -387,7 +495,7 @@ function setupEventListeners() {
     });
 
     document.getElementById('reset-seg-btn')?.addEventListener('click', () => {
-        const confirmReset = confirm("¿Estás seguro de que quieres volver a la segmentación? Se perderá todo el texto asignado a los segmentos actuales.");
+        const confirmReset = confirm(translations[currentLang].reset_confirm);
         if (confirmReset) {
             currentState.stage = 1;
             currentState.segments = [];
@@ -505,7 +613,7 @@ function renderAlignmentsOverview() {
     }
     
     if (blocks.length === 0) {
-        body.innerHTML = '<div style="text-align: center; padding: 40px; font-weight: 800; font-size: 1.2rem;">No hay segmentos alineados todavía. ¡Comienza a alinear la transcripción!</div>';
+        body.innerHTML = `<div style="text-align: center; padding: 40px; font-weight: 800; font-size: 1.2rem;">${translations[currentLang].no_alignments_yet}</div>`;
         return;
     }
     
@@ -523,7 +631,7 @@ function renderAlignmentsOverview() {
             
             const badgeEl = document.createElement('span');
             badgeEl.className = 'block-badge';
-            badgeEl.innerText = `Segmento ${block.index + 1} (${block.start.toFixed(2)}s - ${block.end.toFixed(2)}s)`;
+            badgeEl.innerText = `${translations[currentLang].seg_badge_prefix}${block.index + 1} (${block.start.toFixed(2)}s - ${block.end.toFixed(2)}s)`;
             headerEl.appendChild(badgeEl);
             
             const actionsEl = document.createElement('div');
@@ -531,7 +639,7 @@ function renderAlignmentsOverview() {
             
             const playBtn = document.createElement('button');
             playBtn.className = 'brutalist-button block-btn';
-            playBtn.innerText = '▶ Escuchar';
+            playBtn.innerText = translations[currentLang].listen_btn;
             playBtn.addEventListener('click', () => {
                 playSegmentPreview(block.start, block.end, playBtn);
             });
@@ -539,7 +647,7 @@ function renderAlignmentsOverview() {
             
             const jumpBtn = document.createElement('button');
             jumpBtn.className = 'brutalist-button block-btn secondary-btn';
-            jumpBtn.innerText = 'Ir a segmento';
+            jumpBtn.innerText = translations[currentLang].jump_btn;
             jumpBtn.addEventListener('click', () => {
                 jumpToSegment(block.index);
             });
@@ -561,7 +669,7 @@ function renderAlignmentsOverview() {
             
             const badgeEl = document.createElement('span');
             badgeEl.className = 'block-badge unaligned-badge';
-            badgeEl.innerText = 'Texto Restante';
+            badgeEl.innerText = translations[currentLang].remaining_text;
             headerEl.appendChild(badgeEl);
             
             blockEl.appendChild(headerEl);
@@ -570,7 +678,6 @@ function renderAlignmentsOverview() {
             textEl.className = 'block-text';
             textEl.innerText = block.text.trim();
             
-            // Only add if it's not just whitespace
             if (textEl.innerText.length > 0) {
                 blockEl.appendChild(textEl);
             } else {
@@ -588,7 +695,7 @@ function playSegmentPreview(start, end, btn) {
     if (previewAudio && !previewAudio.paused) {
         previewAudio.pause();
         if (currentPlayingBtn) {
-            currentPlayingBtn.innerText = '▶ Escuchar';
+            currentPlayingBtn.innerText = translations[currentLang].listen_btn;
         }
         
         if (currentPlayingBtn === btn) {
@@ -601,11 +708,11 @@ function playSegmentPreview(start, end, btn) {
     const url = `/api/get_segment_audio?path=${currentState.audio_path}&start=${start}&end=${end}`;
     previewAudio = new Audio(url);
     currentPlayingBtn = btn;
-    btn.innerText = '⏸ Pausa';
+    btn.innerText = translations[currentLang].pause_btn;
     
     previewAudio.play();
     previewAudio.onended = () => {
-        btn.innerText = '▶ Escuchar';
+        btn.innerText = translations[currentLang].listen_btn;
         previewAudio = null;
         currentPlayingBtn = null;
     };
@@ -631,7 +738,7 @@ function openCompletionModal() {
         previewAudio.pause();
         previewAudio = null;
         if (currentPlayingBtn) {
-            currentPlayingBtn.innerText = '▶ Escuchar';
+            currentPlayingBtn.innerText = translations[currentLang].listen_btn;
             currentPlayingBtn = null;
         }
     }
@@ -649,7 +756,7 @@ function closeCompletionModal() {
         previewAudio.pause();
         previewAudio = null;
         if (currentPlayingBtn) {
-            currentPlayingBtn.innerText = '▶ Escuchar';
+            currentPlayingBtn.innerText = translations[currentLang].listen_btn;
             currentPlayingBtn = null;
         }
     }
@@ -708,7 +815,7 @@ function renderCompletionOverview() {
     }
     
     if (blocks.length === 0) {
-        body.innerHTML = '<div style="text-align: center; padding: 40px; font-weight: 800; font-size: 1.2rem;">No hay segmentos alineados todavía.</div>';
+        body.innerHTML = `<div style="text-align: center; padding: 40px; font-weight: 800; font-size: 1.2rem;">${translations[currentLang].no_alignments_yet}</div>`;
         return;
     }
     
@@ -726,7 +833,7 @@ function renderCompletionOverview() {
             
             const badgeEl = document.createElement('span');
             badgeEl.className = 'block-badge';
-            badgeEl.innerText = `Segmento ${block.index + 1} (${block.start.toFixed(2)}s - ${block.end.toFixed(2)}s)`;
+            badgeEl.innerText = `${translations[currentLang].seg_badge_prefix}${block.index + 1} (${block.start.toFixed(2)}s - ${block.end.toFixed(2)}s)`;
             headerEl.appendChild(badgeEl);
             
             const actionsEl = document.createElement('div');
@@ -734,7 +841,7 @@ function renderCompletionOverview() {
             
             const playBtn = document.createElement('button');
             playBtn.className = 'brutalist-button block-btn';
-            playBtn.innerText = '▶ Escuchar';
+            playBtn.innerText = translations[currentLang].listen_btn;
             playBtn.addEventListener('click', () => {
                 playSegmentPreview(block.start, block.end, playBtn);
             });
@@ -742,7 +849,7 @@ function renderCompletionOverview() {
             
             const jumpBtn = document.createElement('button');
             jumpBtn.className = 'brutalist-button block-btn secondary-btn';
-            jumpBtn.innerText = 'Corregir';
+            jumpBtn.innerText = translations[currentLang].correct_btn;
             jumpBtn.addEventListener('click', () => {
                 closeCompletionModal();
                 jumpToSegment(block.index);
@@ -765,7 +872,7 @@ function renderCompletionOverview() {
             
             const badgeEl = document.createElement('span');
             badgeEl.className = 'block-badge unaligned-badge';
-            badgeEl.innerText = 'Texto Restante';
+            badgeEl.innerText = translations[currentLang].remaining_text;
             headerEl.appendChild(badgeEl);
             
             blockEl.appendChild(headerEl);
@@ -785,4 +892,34 @@ function renderCompletionOverview() {
     });
     
     body.appendChild(listContainer);
+}
+
+function toggleLanguage() {
+    currentLang = currentLang === 'en' ? 'es' : 'en';
+    localStorage.setItem('aligner_lang', currentLang);
+    updateLanguageUI();
+}
+
+function updateLanguageUI() {
+    const langBtn = document.getElementById('lang-toggle-btn');
+    if (langBtn) {
+        langBtn.innerText = currentLang === 'en' ? '🌐 ES' : '🌐 EN';
+    }
+
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[currentLang] && translations[currentLang][key]) {
+            el.innerText = translations[currentLang][key];
+        }
+    });
+
+    document.querySelectorAll('.project-segments-status').forEach(el => {
+        const completed = el.getAttribute('data-completed');
+        const total = el.getAttribute('data-total');
+        el.innerText = `${completed} / ${total} ${translations[currentLang].segments_aligned}`;
+    });
+
+    if (config) {
+        renderTranscription();
+    }
 }
