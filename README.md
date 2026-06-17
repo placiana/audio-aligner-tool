@@ -1,6 +1,6 @@
 # Audio Aligner
 
-A semi-automated tool for aligning audio recordings with their corresponding text transcriptions. This project facilitates the creation of time-aligned text for applications like synchronized highlighting during audio playback.
+A web-based, semi-automated service for aligning audio recordings with their corresponding text transcriptions. This tool facilitates the creation of time-aligned text for applications like synchronized highlighting during audio playback, or exporting alignments to third-party tools like ELAN.
 
 ## Preview
 
@@ -8,81 +8,100 @@ A semi-automated tool for aligning audio recordings with their corresponding tex
 
 ---
 
-## Project Overview
+## Project Features
 
-The Audio Aligner is a Flask-based web application that streamlines the audio-text alignment process through a two-stage workflow:
+The Audio Aligner service runs on a Flask backend and offers a multi-user workspace structured around **Projects** and **Tracks**:
 
-1. **Segmentation (Stage 1):** The application uses silence detection to automatically suggest potential split points in long audio files (e.g., full Bible chapters). Users can visually adjust these segments using a waveform interface.
-2. **Alignment (Stage 2):** Each segment is presented individually. The user plays the segment and highlights the corresponding text from the full transcription. The application then saves the start/end timestamps and the assigned text.
-3. **Multi-language Support:** The application fully supports dynamic language switching between **English (default)** and **Spanish** via an interactive toggle button in the header. The chosen language is stored persistently in browser storage (`localStorage`).
-
-### Key Technologies
-
-*   **Backend:** Python 3, Flask
-*   **Audio Processing:** `pydub` (slicing, silence detection), `librosa`
-*   **Frontend:** Vanilla JavaScript, Wavesurfer.js (waveform visualization & regions)
-*   **Data Storage:** Local JSON files (`config.json`, `state.json`)
+1. **User Authentication:** Simple signup and login system to partition workspaces securely.
+2. **Project Workspace & Predefined Workflows:** Create logical project containers (e.g. *Bible*, *Verbal Art*) matching one of three predefined workflows:
+   - **Solo segmentación (Segmentation Only):** Requires only an audio file. Used to partition long audio files by silences and adjust timings without text elements.
+   - **Segmentación y transcripción (Segmentation & Transcription):** Requires only an audio file. Users split audio tracks and type the transcription directly segment-by-segment in Stage 2.
+   - **Segmentación y alineamiento (Segmentation & Alignment):** Requires both audio and text files. Original aligner behavior, allowing users to map segments to spans highlighted from preloaded text.
+3. **Interactive Track Uploads:** Upload audio (.mp3/.wav) and transcription scripts (.txt). The text file upload is dynamically made required or hidden based on the workspace type.
+4. **Segmentation (Stage 1):** Suggests split points using automated silence detection. Exposes parameters directly in the UI:
+   - **Minimum silence length (ms)**
+   - **Silence threshold (dB)**
+   - **Target segment duration (s)**
+   - Includes a **Waveform Zoom** slider.
+5. **Alignment & Tuning (Stage 2):** Play segment audio and align it:
+   - Highlight the corresponding text in the transcription panel, which automatically copies it to the segment input.
+   - Edit the segment text directly in the active segment transcription box.
+   - **Playback Speeds:** Select slow-playback options (`0.5x`, `0.75x`) alongside standard rates (`1x`, `1.5x`, `2x`).
+   - **Fine-Tune Timings (Re-segmentation):** Adjust the start/end boundaries of the active segment dynamically by `+/- 0.1` seconds without going back to Stage 1.
+   - Zoom controls are also available for the segment waveform.
+6. **ELAN Export:** Export time-aligned transcriptions to native ELAN `.eaf` XML files containing a single transcription tier with millisecond precision.
+7. **Consolidated Migration:** When a user first registers, the server searches for legacy local `config.json` and `state.json` files and automatically migrates them into a project named *Toba Bible (Imported)*.
 
 ---
 
 ## Directory Structure
 
-*   `app.py`: Main Flask application handling API endpoints and server logic.
-*   `process_bible.py`: Utility script to extract chapter-wise text files from a bulk JSON source.
-*   `config.json`: Defines the available audio-text pairs (projects).
-*   `state.json`: Persists the alignment progress, segment timestamps, and assigned text for each project.
-*   `uploads/`:
-    *   `audio/`: Source MP3 files.
-    *   `texts/`: Chapter-wise text files.
+*   `app.py`: Main Flask application handling routing, session auth, API endpoints, and server settings.
+*   `database.py`: Encapsulates SQLite database connection, table initialization, and CRUD helpers.
+*   `elan_exporter.py`: Utility module generating ELAN `.eaf` format XML documents.
+*   `process_bible.py`: Legacy utility script to extract chapter-wise text files from bulk sources.
+*   `config.json`: (Legacy) Defines default audio-text pairs used during database seeding.
+*   `state.json`: (Legacy) Preserves legacy local alignment progress used during database seeding.
+*   `uploads/`: Folder containing source audio files and text files, now sorted under project subfolders.
 *   `static/`:
-    *   `js/main.js`: Core frontend logic, Wavesurfer integration, and API communication.
-*   `templates/index.html`: The single-page application template.
+    *   `js/main.js`: Core frontend logic, Wavesurfer.js integration, play rate bindings, and API calls.
+    *   `css/style.css`: Neo-Brutalist UI styling.
+*   `templates/`:
+    *   `base.html`: Main layout template with styling and navigation menus.
+    *   `login.html`: Neo-Brutalist user login screen.
+    *   `register.html`: User registration screen.
+    *   `dashboard.html`: Project dashboard listing available work units.
+    *   `project_detail.html`: Workspace detail panel displaying tracks, completion gauges, and upload forms.
+    *   `index.html`: The main alignment editor page.
 
 ---
 
-## Building and Running
+## Setup and Running
 
-### Prerequisites
+### Method 1: Running Locally
 
+#### Prerequisites
 *   Python 3.x
-*   FFmpeg (required by `pydub` for audio manipulation)
+*   FFmpeg (required by `pydub` to slice audio tracks)
 
-### Setup
+#### Installation
+1. Create and activate a virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Run the Flask application:
+   ```bash
+   python app.py
+   ```
+   Open `http://localhost:5000` in your web browser.
 
-1.  Create and activate a virtual environment:
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows: venv\Scripts\activate
-    ```
-2.  Install dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
+---
 
-### Data Preparation
+### Method 2: Running with Docker (Recommended)
 
-If you have a new `processed_data.json` file, run the processing script to generate individual text files:
+You can run the entire application containerized without manually installing python or FFmpeg on your host machine.
+
+#### Prerequisites
+*   Docker and Docker Compose installed.
+
+#### Run Command
+Start the containers in the background:
 ```bash
-python process_bible.py
+docker compose up -d --build
 ```
-
-### Running the Application
-
-Start the Flask server:
-```bash
-python app.py
-```
-By default, the application will be available at `http://localhost:5000`.
+The application will be running at `http://localhost:5000`. 
+Data directories (`uploads/`) and database files (`aligner.db`) are bound as volumes on the host system to ensure persistence across container updates.
 
 ---
 
 ## Development Conventions
 
-*   **State Management:** The application is "stateless" on the server-side beyond writing to `state.json`. All alignment logic is handled in the frontend and synced via `/api/save_state`.
-*   **Hotkeys:**
-    *   `Space`: Play/Pause the current segment.
-    *   `Ctrl + Enter`: Assign the currently selected text to the active segment and advance to the next.
-*   **Adding New Audio:** 
-    1.  Place the MP3 in `uploads/audio/`.
-    2.  Ensure the corresponding text file exists in `uploads/texts/`.
-    3.  Add an entry to `config.json`.
+*   **State Management:** All user alignment actions are synced to the backend database via `/api/save_state` API calls in JSON format and written into SQLite.
+*   **Keyboard Hotkeys:**
+    *   `Space`: Play/Pause the active segment (when not typing in a text field).
+    *   `Ctrl + Enter`: Assign transcription text to the active segment and advance.

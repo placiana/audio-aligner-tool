@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Audio Aligner{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 350px; gap: 30px; margin-top: 20px;">
+    
+    <!-- Projects List -->
+    <div>
+        <div class="brutalist-card" style="background: white;">
+            <h2 style="margin-top: 0; font-size: 22px; font-weight: 900; text-transform: uppercase; border-bottom: 2.5px solid var(--border-color); padding-bottom: 15px;" data-i18n="projects_title">
+                Your Workspaces / Projects
+            </h2>
+            
+            {% if projects %}
+            <div class="project-list" style="margin-top: 20px;">
+                {% for p in projects %}
+                <div class="project-item" style="border: 2.5px solid var(--border-color); box-shadow: 4px 4px 0px var(--border-color);">
+                    <div class="project-info">
+                        <strong>{{ p.name }}</strong>
+                        <p style="margin: 5px 0 0 0; color: #666; font-size: 14px; font-weight: 600;">
+                            {{ p.description or 'No description provided.' }}
+                        </p>
+                    </div>
+                    <a href="/project/{{ p.id }}" class="brutalist-button button-link" style="background: var(--accent-secondary); box-shadow: 2px 2px 0px var(--border-color); padding: 8px 16px;" data-i18n="open_btn">
+                        Open Project
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div style="text-align: center; padding: 40px; font-weight: 800; font-size: 1.1em; color: #555;" data-i18n="no_projects">
+                📁 No projects yet. Create a project on the right to get started!
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Create Project Panel -->
+    <div>
+        <div class="brutalist-card" style="background: var(--accent-tertiary);">
+            <h3 style="margin-top: 0; font-size: 18px; font-weight: 900; text-transform: uppercase; border-bottom: 2.5px solid var(--border-color); padding-bottom: 10px;" data-i18n="new_project">
+                New Project
+            </h3>
+            <form method="post" action="/project/create" style="display: flex; flex-direction: column; gap: 15px;">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label for="name" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="project_name">Project Name</label>
+                    <input type="text" id="name" name="name" class="brutalist-input" required placeholder="e.g. Bible - Genesis">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label for="type" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="project_type_label">Project Type</label>
+                    <select id="type" name="type" class="brutalist-input" style="background: white; cursor: pointer; font-family: inherit;">
+                        <option value="alignment" data-i18n="type_alignment">Segmentation & Alignment (Audio + Text)</option>
+                        <option value="transcription" data-i18n="type_transcription">Segmentation & Transcription (Audio)</option>
+                        <option value="segmentation" data-i18n="type_segmentation">Segmentation Only (Audio)</option>
+                    </select>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label for="description" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="description">Description</label>
+                    <textarea id="description" name="description" class="brutalist-input" style="height: 80px; resize: none; font-family: inherit;" placeholder="e.g. Aligning Toba Genesis chapters"></textarea>
+                </div>
+                
+                <button type="submit" class="brutalist-button" style="width: 100%; box-shadow: 2px 2px 0px var(--border-color); background: white;" data-i18n="create_project_btn">
+                    ➕ Create Project
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -216,14 +216,7 @@ h1 {
     border: 2px solid black;
 }
 
-#waveform-full,
-#waveform-segment {
-    padding: 15px;
-    border: var(--border-width) solid var(--border-color);
-    background: white;
-    box-shadow: 3px 3px 0px var(--border-color);
-    margin: 25px 0;
-}
+
 
 .segmentation-settings {
     margin-top: 30px;
@@ -236,7 +229,8 @@ h1 {
 .split-layout {
     display: flex;
     gap: 30px;
-    height: 650px;
+    min-height: 650px;
+    height: auto;
 }
 
 .left-panel,
@@ -244,6 +238,18 @@ h1 {
     flex: 1;
     display: flex;
     flex-direction: column;
+    min-width: 0; /* Breaks WaveSurfer canvas infinite width expansion loop */
+}
+
+#waveform-full,
+#waveform-segment {
+    padding: 15px;
+    border: var(--border-width) solid var(--border-color);
+    background: white;
+    box-shadow: 3px 3px 0px var(--border-color);
+    margin: 25px 0;
+    max-width: 100%;
+    overflow: hidden; /* Prevents nested canvas elements from overflowing or stretching the block */
 }
 
 .text-editor {

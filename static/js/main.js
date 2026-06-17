@@ -11,102 +11,35 @@ let currentState = initialState || {
 let currentSpeed = 1;
 let previewAudio = null;
 let currentPlayingBtn = null;
-let currentLang = localStorage.getItem('aligner_lang') || 'en';
+let isUpdatingContiguous = false;
 
-const translations = {
-    en: {
-        title: "Audio Aligner",
-        welcome_title: "Select an audio to process",
-        download_db: "📥 Download Consolidated Database (JSON)",
-        segments_aligned: "segments aligned",
-        open_btn: "Open",
-        back_to_list: "Back to List",
-        reset_btn: "Reset",
-        save_btn: "Save",
-        stage1_title: "Stage 1: Segmentation",
-        file_label: "File:",
-        duration_label: "Duration:",
-        target_duration: "Target (s):",
-        detect_btn: "Detect Segments",
-        confirm_btn: "Confirm & Align",
-        current_segment_title: "Current Segment",
-        play_pause: "Play/Pause",
-        seg_label: "Seg.",
-        prev_btn: "Previous",
-        next_btn: "Next",
-        transcription_title: "Transcription",
-        show_alignments: "View Alignments",
-        alignments_modal_title: "Created Alignments",
-        completion_title: "🎉 AUDIO ALIGNED SUCCESSFULLY!",
-        completion_congrats: "Excellent work! You have completed the alignment of this audio.",
-        completion_instructions: "Review each aligned segment below, listen to the previews to verify synchronization, or return to the list to process a new file.",
-        completion_home: "🏠 Return to Main List",
-        completion_review: "🔍 Return to Editor",
-        completion_preview_title: "Alignments Preview",
-        no_alignments_yet: "No aligned segments yet. Start aligning the transcription!",
-        listen_btn: "▶ Listen",
-        pause_btn: "⏸ Pause",
-        jump_btn: "Go to segment",
-        correct_btn: "Edit",
-        remaining_text: "Remaining Text",
-        reset_confirm: "Are you sure you want to go back to segmentation? All text assigned to the current segments will be lost.",
-        select_text_alert: "Please select the text corresponding to this segment in the panel above with your mouse.",
-        this_seg_badge: "This Seg.",
-        seg_badge_prefix: "Seg. ",
-        assign_highlight_btn: "Assign Highlight (Ctrl + Enter)",
-        next_seg_btn: "Next Segment (Ctrl + Enter)",
-        select_and_assign_btn: "Select text above and assign"
-    },
-    es: {
-        title: "Audio Aligner",
-        welcome_title: "Selecciona un audio para procesar",
-        download_db: "📥 Descargar Base de Datos Consolidada (JSON)",
-        segments_aligned: "segmentos alineados",
-        open_btn: "Abrir",
-        back_to_list: "Volver al listado",
-        reset_btn: "Reiniciar",
-        save_btn: "Guardar",
-        stage1_title: "Fase 1: Segmentación",
-        file_label: "Archivo:",
-        duration_label: "Duración:",
-        target_duration: "Duración obj. (s):",
-        detect_btn: "Detectar Segmentos",
-        confirm_btn: "Confirmar y Alinear",
-        current_segment_title: "Segmento Actual",
-        play_pause: "Reproducir/Pausa",
-        seg_label: "Seg.",
-        prev_btn: "Anterior",
-        next_btn: "Siguiente",
-        transcription_title: "Transcripción",
-        show_alignments: "Ver Alineamientos",
-        alignments_modal_title: "Alineamientos Realizados",
-        completion_title: "🎉 ¡AUDIO ALINEADO CON ÉXITO!",
-        completion_congrats: "¡Excelente trabajo! Has completado la alineación de este audio.",
-        completion_instructions: "Revisa a continuación cada uno de los segmentos alineados, escucha las pistas previas para verificar la sincronización o vuelve al listado para procesar un nuevo archivo.",
-        completion_home: "🏠 Volver al Listado Principal",
-        completion_review: "🔍 Volver al Editor",
-        completion_preview_title: "Vista Previa de Alineamientos",
-        no_alignments_yet: "No hay segmentos alineados todavía. ¡Comienza a alinear la transcripción!",
-        listen_btn: "▶ Escuchar",
-        pause_btn: "⏸ Pausa",
-        jump_btn: "Ir a segmento",
-        correct_btn: "Corregir",
-        remaining_text: "Texto Restante",
-        reset_confirm: "¿Estás seguro de que quieres volver a la segmentación? Se perderá todo el texto asignado a los segmentos actuales.",
-        select_text_alert: "Por favor, selecciona con el ratón el texto correspondiente a este segmento en el panel superior.",
-        this_seg_badge: "Este Seg.",
-        seg_badge_prefix: "Seg. ",
-        assign_highlight_btn: "Asignar Selección (Ctrl + Enter)",
-        next_seg_btn: "Siguiente Segmento (Ctrl + Enter)",
-        select_and_assign_btn: "Selecciona texto arriba y asigna"
-    }
-};
+// Access global translations declared in locale.js
+const translations = window.translations;
 
 document.addEventListener('DOMContentLoaded', () => {
-    currentLang = localStorage.getItem('aligner_lang') || 'en';
     initStage();
     setupEventListeners();
-    updateLanguageUI();
+    
+    // Selection listener to sync text highlighting into input textarea
+    document.addEventListener('selectionchange', () => {
+        if (currentState.stage === 2 && config && config.text_path && config.project_type === 'alignment') {
+            const selection = window.getSelection().toString().trim();
+            const textContainer = document.getElementById('text-container');
+            if (selection && textContainer && textContainer.contains(window.getSelection().anchorNode)) {
+                const manualInput = document.getElementById('manual-transcription-input');
+                if (manualInput) {
+                    manualInput.value = selection;
+                }
+            }
+        }
+    });
+
+    // Listen to global language change event to refresh highlighted text
+    window.addEventListener('languagechanged', () => {
+        if (config) {
+            renderTranscription();
+        }
+    });
 });
 
 function initStage() {
@@ -121,6 +54,42 @@ function initStage() {
         document.getElementById('stage1').style.display = 'none';
         document.getElementById('stage2').style.display = 'block';
         if (resetBtn) resetBtn.style.display = 'block';
+        
+        // Dynamic layout adjust based on project type
+        const rightPanel = document.querySelector('.right-panel');
+        const leftPanel = document.querySelector('.left-panel');
+        const splitLayout = document.querySelector('.split-layout');
+        const textContainer = document.getElementById('text-container');
+        const manualContainer = document.getElementById('manual-transcription-container');
+        
+        if (config.project_type === 'segmentation') {
+            if (rightPanel) rightPanel.style.display = 'none';
+            if (leftPanel) {
+                leftPanel.style.flex = '1 0 100%';
+                leftPanel.style.maxWidth = '100%';
+            }
+            if (splitLayout) splitLayout.style.height = 'auto';
+        } else if (config.project_type === 'transcription') {
+            if (rightPanel) rightPanel.style.display = 'block';
+            if (leftPanel) {
+                leftPanel.style.flex = '1';
+                leftPanel.style.maxWidth = '';
+            }
+            if (splitLayout) splitLayout.style.height = 'auto';
+            if (textContainer) textContainer.style.display = 'none';
+            if (manualContainer) manualContainer.style.display = 'flex';
+        } else {
+            // alignment
+            if (rightPanel) rightPanel.style.display = 'block';
+            if (leftPanel) {
+                leftPanel.style.flex = '1';
+                leftPanel.style.maxWidth = '';
+            }
+            if (splitLayout) splitLayout.style.height = 'auto';
+            if (textContainer) textContainer.style.display = 'block';
+            if (manualContainer) manualContainer.style.display = 'flex';
+        }
+        
         initWaveformSegment();
         loadTranscription();
     }
@@ -136,6 +105,7 @@ function initWaveformFull() {
         waveColor: '#4F4A85',
         progressColor: '#383351',
         url: `/uploads/${currentState.audio_path}`,
+        minPxPerSec: 20
     });
 
     regions = wsFull.registerPlugin(WaveSurfer.Regions.create());
@@ -152,15 +122,49 @@ function initWaveformFull() {
     });
 
     regions.on('region-updated', (region) => {
+        if (isUpdatingContiguous) return;
+
         const idx = currentState.segments.findIndex(s => s.id === region.id);
         if (idx !== -1) {
+            const oldStart = currentState.segments[idx].start;
+            const oldEnd = currentState.segments[idx].end;
+
             currentState.segments[idx].start = region.start;
             currentState.segments[idx].end = region.end;
             
-            // Update the label inside the region
             const label = region.element.querySelector('.region-label');
             if (label) {
                 label.innerText = `${(region.end - region.start).toFixed(1)}s`;
+            }
+
+            isUpdatingContiguous = true;
+            try {
+                // If start position changed, snap the end of the previous region
+                if (region.start !== oldStart && idx > 0) {
+                    const prevRegion = regions.getRegions().find(r => r.id === `seg-${idx - 1}`);
+                    if (prevRegion) {
+                        prevRegion.setOptions({ end: region.start });
+                        currentState.segments[idx - 1].end = region.start;
+                        const prevLabel = prevRegion.element.querySelector('.region-label');
+                        if (prevLabel) {
+                            prevLabel.innerText = `${(prevRegion.end - prevRegion.start).toFixed(1)}s`;
+                        }
+                    }
+                }
+                // If end position changed, snap the start of the next region
+                if (region.end !== oldEnd && idx < currentState.segments.length - 1) {
+                    const nextRegion = regions.getRegions().find(r => r.id === `seg-${idx + 1}`);
+                    if (nextRegion) {
+                        nextRegion.setOptions({ start: region.end });
+                        currentState.segments[idx + 1].start = region.end;
+                        const nextLabel = nextRegion.element.querySelector('.region-label');
+                        if (nextLabel) {
+                            nextLabel.innerText = `${(nextRegion.end - nextRegion.start).toFixed(1)}s`;
+                        }
+                    }
+                }
+            } finally {
+                isUpdatingContiguous = false;
             }
         }
     });
@@ -186,6 +190,13 @@ function renderRegions() {
 function createRegionLabel(duration) {
     const el = document.createElement('div');
     el.className = 'region-label';
+    el.style.background = '#000000';
+    el.style.color = '#ffffff';
+    el.style.border = '2px solid #ffffff';
+    el.style.fontSize = '13px';
+    el.style.fontWeight = '900';
+    el.style.padding = '4px 8px';
+    el.style.boxShadow = '2px 2px 0px #000000';
     el.innerText = `${duration.toFixed(1)}s`;
     return el;
 }
@@ -200,7 +211,11 @@ async function detectSegments() {
     if (!config) return;
     const btn = document.getElementById('detect-btn');
     const loader = document.getElementById('segmentation-loader');
+    
+    // Read silence configuration parameters
     const targetDuration = parseInt(document.getElementById('target-duration-input').value) || 25;
+    const silenceMs = parseInt(document.getElementById('silence-ms-input').value) || 500;
+    const silenceDb = parseInt(document.getElementById('silence-db-input').value) || -20;
     
     btn.disabled = true;
     loader.style.display = 'block';
@@ -211,7 +226,9 @@ async function detectSegments() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 audio_path: currentState.audio_path,
-                target_duration: targetDuration
+                target_duration: targetDuration,
+                min_silence_len: silenceMs,
+                silence_thresh: silenceDb
             })
         });
         const data = await response.json();
@@ -237,16 +254,26 @@ function initWaveformSegment() {
         waveColor: '#4F4A85',
         progressColor: '#383351',
         url: segmentUrl,
+        minPxPerSec: 50
     });
 
     wsSegment.on('decode', () => {
         wsSegment.setPlaybackRate(currentSpeed);
     });
 
-    // Loop logic - simplified since the file is only the segment
     wsSegment.on('finish', () => {
         wsSegment.setTime(0);
         wsSegment.play();
+    });
+
+    wsSegment.on('play', () => {
+        const btn = document.getElementById('play-segment-btn');
+        if (btn) btn.innerText = '⏸';
+    });
+
+    wsSegment.on('pause', () => {
+        const btn = document.getElementById('play-segment-btn');
+        if (btn) btn.innerText = '▶';
     });
 }
 
@@ -254,11 +281,21 @@ let originalTranscription = "";
 
 async function loadTranscription() {
     if (!config) return;
-    const response = await fetch(`/api/load_text?path=${currentState.text_path}`);
-    const data = await response.json();
-    originalTranscription = data.text;
-    
     document.getElementById('total-segments').innerText = currentState.segments.length;
+    
+    if (config.project_type === 'alignment' && config.text_path && config.text_path !== "") {
+        try {
+            const response = await fetch(`/api/load_text?path=${config.text_path}`);
+            const data = await response.json();
+            originalTranscription = data.text || "";
+        } catch (e) {
+            console.error("Error loading transcription", e);
+            originalTranscription = "";
+        }
+    } else {
+        originalTranscription = "";
+    }
+    
     renderTranscription();
 }
 
@@ -266,132 +303,149 @@ function renderTranscription() {
     const container = document.getElementById('text-container');
     if (!container) return;
     
-    container.style.display = 'block';
-    container.style.padding = '25px';
-    container.innerHTML = '';
-    
-    const escapeHtml = (str) => {
-        return str
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    };
-
-    // Calculate the absolute character ranges of already aligned segments
-    let lastIdx = 0;
-    const ranges = currentState.segments.map((seg, i) => {
-        if (!seg.text) return null;
-        let found = originalTranscription.indexOf(seg.text, lastIdx);
-        if (found === -1) {
-            found = originalTranscription.indexOf(seg.text);
-        }
-        if (found !== -1) {
-            lastIdx = found + seg.text.length;
-            return {
-                index: i,
-                start: found,
-                end: found + seg.text.length,
-                text: seg.text
-            };
-        }
-        return null;
-    });
-
-    // Filter nulls and sort by start index
-    const activeRanges = ranges.filter(r => r !== null).sort((a, b) => a.start - b.start);
-
-    let html = "";
-    let currentPos = 0;
-
-    activeRanges.forEach(r => {
-        // Unaligned gap before this segment
-        if (r.start > currentPos) {
-            const unalignedText = originalTranscription.substring(currentPos, r.start);
-            html += `<span>${escapeHtml(unalignedText)}</span>`;
-        }
-        
-        // Highlighted segment
-        const segmentText = originalTranscription.substring(r.start, r.end);
-        const isActive = (r.index === currentState.current_idx);
-        const highlightClass = isActive ? 'inline-highlight active' : 'inline-highlight aligned';
-        const labelBadge = isActive ? translations[currentLang].this_seg_badge : `${translations[currentLang].seg_badge_prefix}${r.index + 1}`;
-        
-        html += `<span class="${highlightClass}" data-idx="${r.index}" title="${labelBadge}">${escapeHtml(segmentText)}</span>`;
-        
-        currentPos = r.end;
-    });
-
-    // Unaligned remaining text at the end
-    if (currentPos < originalTranscription.length) {
-        const unalignedText = originalTranscription.substring(currentPos);
-        html += `<span>${escapeHtml(unalignedText)}</span>`;
-    }
-
-    container.innerHTML = html;
-
-    // Attach click listeners to jump to segments directly when clicking highlighted spans
-    const spans = container.querySelectorAll('.inline-highlight');
-    spans.forEach(span => {
-        span.addEventListener('click', (e) => {
-            // Prevent interference with text selection dragging
-            if (window.getSelection().toString().trim().length > 0) return;
-            
-            const idx = parseInt(span.dataset.idx);
-            if (idx !== currentState.current_idx) {
-                jumpToSegment(idx);
-            }
-        });
-    });
-    
-    // Update metadata
+    // Update active segment indices
     document.getElementById('current-segment-idx').innerText = currentState.current_idx + 1;
     const seg = currentState.segments[currentState.current_idx];
-    document.getElementById('segment-duration').innerText = (seg.end - seg.start).toFixed(2);
-    
-    // Update dynamic Assign button label
-    const assignBtn = document.getElementById('assign-btn');
-    if (assignBtn) {
-        const currentText = currentState.segments[currentState.current_idx].text;
-        if (currentText) {
-            assignBtn.innerText = translations[currentLang].next_seg_btn;
-            assignBtn.disabled = false;
-            assignBtn.style.opacity = '1';
-            assignBtn.style.cursor = 'pointer';
-        } else {
-            assignBtn.innerText = translations[currentLang].select_and_assign_btn;
-            assignBtn.disabled = false;
-            assignBtn.style.opacity = '1';
-            assignBtn.style.cursor = 'pointer';
+    if (seg) {
+        document.getElementById('segment-duration').innerText = (seg.end - seg.start).toFixed(2);
+        
+        // Load text into manual text entry
+        const manualInput = document.getElementById('manual-transcription-input');
+        if (manualInput) {
+            manualInput.value = seg.text || '';
         }
     }
     
-    // Scroll active span into view smoothly
-    setTimeout(() => {
-        const activeSpan = container.querySelector('.inline-highlight.active');
-        if (activeSpan) {
-            activeSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // If text file was loaded and project type is alignment, render highlights
+    if (config.project_type === 'alignment' && config.text_path && config.text_path !== "" && originalTranscription !== "") {
+        container.style.display = 'block';
+        container.innerHTML = '';
+        
+        const escapeHtml = (str) => {
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        };
+
+        let lastIdx = 0;
+        const ranges = currentState.segments.map((s, i) => {
+            if (!s.text) return null;
+            let found = originalTranscription.indexOf(s.text, lastIdx);
+            if (found === -1) {
+                found = originalTranscription.indexOf(s.text);
+            }
+            if (found !== -1) {
+                lastIdx = found + s.text.length;
+                return {
+                    index: i,
+                    start: found,
+                    end: found + s.text.length,
+                    text: s.text
+                };
+            }
+            return null;
+        });
+
+        const activeRanges = ranges.filter(r => r !== null).sort((a, b) => a.start - b.start);
+
+        let html = "";
+        let currentPos = 0;
+
+        activeRanges.forEach(r => {
+            if (r.start > currentPos) {
+                const unalignedText = originalTranscription.substring(currentPos, r.start);
+                html += `<span>${escapeHtml(unalignedText)}</span>`;
+            }
+            
+            const segmentText = originalTranscription.substring(r.start, r.end);
+            const isActive = (r.index === currentState.current_idx);
+            const highlightClass = isActive ? 'inline-highlight active' : 'inline-highlight aligned';
+            const labelBadge = isActive ? translations[currentLang].this_seg_badge : `${translations[currentLang].seg_badge_prefix}${r.index + 1}`;
+            
+            html += `<span class="${highlightClass}" data-idx="${r.index}" title="${labelBadge}">${escapeHtml(segmentText)}</span>`;
+            currentPos = r.end;
+        });
+
+        if (currentPos < originalTranscription.length) {
+            const unalignedText = originalTranscription.substring(currentPos);
+            html += `<span>${escapeHtml(unalignedText)}</span>`;
         }
-    }, 100);
+
+        container.innerHTML = html;
+
+        // Add click listeners to highlighted items
+        const spans = container.querySelectorAll('.inline-highlight');
+        spans.forEach(span => {
+            span.addEventListener('click', () => {
+                if (window.getSelection().toString().trim().length > 0) return;
+                const idx = parseInt(span.dataset.idx);
+                if (idx !== currentState.current_idx) {
+                    jumpToSegment(idx);
+                }
+            });
+        });
+        
+        setTimeout(() => {
+            const activeSpan = container.querySelector('.inline-highlight.active');
+            if (activeSpan) {
+                activeSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
+    } else {
+        container.style.display = 'none';
+    }
+    
+    // Update Assign button labels based on type
+    const assignBtn = document.getElementById('assign-btn');
+    if (assignBtn && seg) {
+        if (config.project_type === 'segmentation') {
+            assignBtn.style.display = 'none';
+        } else if (config.project_type === 'transcription') {
+            assignBtn.style.display = 'block';
+            if (seg.text) {
+                assignBtn.innerText = translations[currentLang].next_seg_btn;
+            } else {
+                assignBtn.innerText = translations[currentLang].save_segment_btn;
+            }
+        } else {
+            // alignment
+            assignBtn.style.display = 'block';
+            if (seg.text) {
+                assignBtn.innerText = translations[currentLang].next_seg_btn;
+            } else {
+                assignBtn.innerText = translations[currentLang].assign_highlight_btn;
+            }
+        }
+    }
 }
 
 function updateSegmentUI() {
     if (!config) return;
     renderTranscription();
 
+    const btn = document.getElementById('play-segment-btn');
+    if (btn) btn.innerText = '▶';
+
     const seg = currentState.segments[currentState.current_idx];
-    const segmentUrl = `/api/get_segment_audio?path=${currentState.audio_path}&start=${seg.start}&end=${seg.end}`;
-    if (wsSegment) {
-        wsSegment.load(segmentUrl);
+    if (seg) {
+        const segmentUrl = `/api/get_segment_audio?path=${currentState.audio_path}&start=${seg.start}&end=${seg.end}`;
+        if (wsSegment) {
+            wsSegment.load(segmentUrl);
+        }
     }
 }
 
 function assignText() {
     if (!config) return;
-    const selection = window.getSelection().toString().trim();
-    if (selection) {
-        currentState.segments[currentState.current_idx].text = selection;
+    
+    const manualInput = document.getElementById('manual-transcription-input');
+    const textVal = manualInput ? manualInput.value.trim() : '';
+    
+    if (textVal !== "") {
+        currentState.segments[currentState.current_idx].text = textVal;
         saveState();
         
         if (currentState.current_idx === currentState.segments.length - 1) {
@@ -401,17 +455,7 @@ function assignText() {
             nextSegment();
         }
     } else {
-        const currentText = currentState.segments[currentState.current_idx].text;
-        if (currentText) {
-            if (currentState.current_idx === currentState.segments.length - 1) {
-                updateProgress();
-                openCompletionModal();
-            } else {
-                nextSegment();
-            }
-        } else {
-            alert(translations[currentLang].select_text_alert);
-        }
+        alert(translations[currentLang].select_text_alert);
     }
 }
 
@@ -420,6 +464,10 @@ function nextSegment() {
         currentState.current_idx++;
         updateSegmentUI();
         updateProgress();
+    } else {
+        // Segmentation/Transcription/Alignment complete
+        updateProgress();
+        openCompletionModal();
     }
 }
 
@@ -433,6 +481,7 @@ function prevSegment() {
 
 async function saveState() {
     if (!config) return;
+    currentState.item_id = config.item_id;
     await fetch('/api/save_state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -444,18 +493,77 @@ function updateProgress() {
     if (!config) return;
     const total = currentState.segments.length;
     if (total === 0) return;
-    const completed = currentState.segments.filter(s => s.text).length;
-    const percent = Math.round((completed / total) * 100);
+    
+    let percent = 0;
+    if (config.project_type === 'segmentation') {
+        // Progress tracks viewed / checked segments
+        percent = Math.round(((currentState.current_idx + 1) / total) * 100);
+    } else {
+        const completed = currentState.segments.filter(s => s.text).length;
+        percent = Math.round((completed / total) * 100);
+    }
+    
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
     if (progressBar) progressBar.style.width = `${percent}%`;
     if (progressText) progressText.innerText = `${percent}%`;
 }
 
-function setupEventListeners() {
-    document.getElementById('lang-toggle-btn')?.addEventListener('click', toggleLanguage);
-
+// Re-segmentation timeline tuning function
+function adjustSegmentTime(boundary, delta) {
     if (!config) return;
+    const seg = currentState.segments[currentState.current_idx];
+    if (!seg) return;
+    
+    if (boundary === 'start') {
+        const newStart = Math.max(0, seg.start + delta);
+        if (newStart < seg.end) {
+            seg.start = newStart;
+        }
+    } else if (boundary === 'end') {
+        const newEnd = seg.end + delta;
+        if (newEnd > seg.start) {
+            seg.end = newEnd;
+        }
+    }
+    
+    // Save new state immediately
+    saveState();
+    
+    // Update display labels
+    document.getElementById('segment-duration').innerText = (seg.end - seg.start).toFixed(2);
+    
+    // Reload segment waveform with corrected timings
+    const segmentUrl = `/api/get_segment_audio?path=${currentState.audio_path}&start=${seg.start}&end=${seg.end}`;
+    if (wsSegment) {
+        wsSegment.load(segmentUrl);
+    }
+}
+
+function setupEventListeners() {
+    if (!config) return;
+
+    // Zoom slider bindings
+    document.getElementById('zoom-slider-stage1')?.addEventListener('input', (e) => {
+        const zoomVal = parseInt(e.target.value);
+        document.getElementById('zoom-value-stage1').innerText = `${zoomVal} px/s`;
+        if (wsFull) {
+            wsFull.zoom(zoomVal);
+        }
+    });
+
+    document.getElementById('zoom-slider-stage2')?.addEventListener('input', (e) => {
+        const zoomVal = parseInt(e.target.value);
+        if (wsSegment) {
+            wsSegment.zoom(zoomVal);
+        }
+    });
+
+    // Fine-tune timing listener adjustments
+    document.getElementById('adj-start-minus')?.addEventListener('click', () => adjustSegmentTime('start', -0.1));
+    document.getElementById('adj-start-plus')?.addEventListener('click', () => adjustSegmentTime('start', 0.1));
+    document.getElementById('adj-end-minus')?.addEventListener('click', () => adjustSegmentTime('end', -0.1));
+    document.getElementById('adj-end-plus')?.addEventListener('click', () => adjustSegmentTime('end', 0.1));
 
     document.getElementById('detect-btn')?.addEventListener('click', detectSegments);
     
@@ -468,7 +576,9 @@ function setupEventListeners() {
     });
 
     document.getElementById('play-segment-btn')?.addEventListener('click', () => {
-        wsSegment.playPause();
+        if (wsSegment) {
+            wsSegment.playPause();
+        }
     });
 
     document.getElementById('prev-btn')?.addEventListener('click', prevSegment);
@@ -514,7 +624,7 @@ function setupEventListeners() {
                 wsSegment.setPlaybackRate(speed);
             }
             
-            // Update UI
+            // Update speed buttons active states
             document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
         });
@@ -526,13 +636,19 @@ function setupEventListeners() {
             closeCompletionModal();
         }
         if (currentState.stage === 2) {
-            if (e.code === 'Space' && e.target.tagName !== 'TEXTAREA') {
+            if (e.code === 'Space' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
                 e.preventDefault();
-                wsSegment.playPause();
+                if (wsSegment) {
+                    wsSegment.playPause();
+                }
             }
             if (e.ctrlKey && e.key === 'Enter') {
                 e.preventDefault();
-                assignText();
+                if (config.project_type !== 'segmentation') {
+                    assignText();
+                } else {
+                    nextSegment();
+                }
             }
         }
     });
@@ -552,7 +668,6 @@ function closeAlignmentsModal() {
     
     modal.style.display = 'none';
     
-    // Pause any preview audio that is playing
     if (previewAudio) {
         previewAudio.pause();
         previewAudio = null;
@@ -566,53 +681,7 @@ function renderAlignmentsOverview() {
     
     body.innerHTML = '';
     
-    let lastIndex = 0;
-    const blocks = [];
-    
-    currentState.segments.forEach((seg, i) => {
-        if (seg.text) {
-            let foundIndex = originalTranscription.indexOf(seg.text, lastIndex);
-            
-            if (foundIndex === -1) {
-                foundIndex = originalTranscription.indexOf(seg.text);
-            }
-            
-            if (foundIndex !== -1) {
-                if (foundIndex > lastIndex) {
-                    blocks.push({
-                        type: 'unaligned',
-                        text: originalTranscription.substring(lastIndex, foundIndex)
-                    });
-                }
-                blocks.push({
-                    type: 'aligned',
-                    index: i,
-                    start: seg.start,
-                    end: seg.end,
-                    text: seg.text
-                });
-                lastIndex = foundIndex + seg.text.length;
-            } else {
-                blocks.push({
-                    type: 'aligned',
-                    index: i,
-                    start: seg.start,
-                    end: seg.end,
-                    text: seg.text,
-                    orphan: true
-                });
-            }
-        }
-    });
-    
-    if (lastIndex < originalTranscription.length) {
-        blocks.push({
-            type: 'unaligned',
-            text: originalTranscription.substring(lastIndex)
-        });
-    }
-    
-    if (blocks.length === 0) {
+    if (currentState.segments.length === 0) {
         body.innerHTML = `<div style="text-align: center; padding: 40px; font-weight: 800; font-size: 1.2rem;">${translations[currentLang].no_alignments_yet}</div>`;
         return;
     }
@@ -620,10 +689,9 @@ function renderAlignmentsOverview() {
     const listContainer = document.createElement('div');
     listContainer.className = 'alignments-list';
     
-    blocks.forEach(block => {
-        const blockEl = document.createElement('div');
-        
-        if (block.type === 'aligned') {
+    if (config.project_type === 'segmentation') {
+        currentState.segments.forEach((seg, i) => {
+            const blockEl = document.createElement('div');
             blockEl.className = 'alignment-block aligned';
             
             const headerEl = document.createElement('div');
@@ -631,7 +699,7 @@ function renderAlignmentsOverview() {
             
             const badgeEl = document.createElement('span');
             badgeEl.className = 'block-badge';
-            badgeEl.innerText = `${translations[currentLang].seg_badge_prefix}${block.index + 1} (${block.start.toFixed(2)}s - ${block.end.toFixed(2)}s)`;
+            badgeEl.innerText = `${translations[currentLang].seg_badge_prefix}${i + 1} (${seg.start.toFixed(2)}s - ${seg.end.toFixed(2)}s)`;
             headerEl.appendChild(badgeEl);
             
             const actionsEl = document.createElement('div');
@@ -641,7 +709,7 @@ function renderAlignmentsOverview() {
             playBtn.className = 'brutalist-button block-btn';
             playBtn.innerText = translations[currentLang].listen_btn;
             playBtn.addEventListener('click', () => {
-                playSegmentPreview(block.start, block.end, playBtn);
+                playSegmentPreview(seg.start, seg.end, playBtn);
             });
             actionsEl.appendChild(playBtn);
             
@@ -649,44 +717,132 @@ function renderAlignmentsOverview() {
             jumpBtn.className = 'brutalist-button block-btn secondary-btn';
             jumpBtn.innerText = translations[currentLang].jump_btn;
             jumpBtn.addEventListener('click', () => {
-                jumpToSegment(block.index);
+                jumpToSegment(i);
             });
             actionsEl.appendChild(jumpBtn);
             
             headerEl.appendChild(actionsEl);
             blockEl.appendChild(headerEl);
             
-            const textEl = document.createElement('div');
-            textEl.className = 'block-text';
-            textEl.innerText = block.text;
-            blockEl.appendChild(textEl);
-            
-        } else {
-            blockEl.className = 'alignment-block unaligned';
-            
-            const headerEl = document.createElement('div');
-            headerEl.className = 'block-header';
-            
-            const badgeEl = document.createElement('span');
-            badgeEl.className = 'block-badge unaligned-badge';
-            badgeEl.innerText = translations[currentLang].remaining_text;
-            headerEl.appendChild(badgeEl);
-            
-            blockEl.appendChild(headerEl);
-            
-            const textEl = document.createElement('div');
-            textEl.className = 'block-text';
-            textEl.innerText = block.text.trim();
-            
-            if (textEl.innerText.length > 0) {
-                blockEl.appendChild(textEl);
-            } else {
-                return; // Skip empty unaligned blocks
+            listContainer.appendChild(blockEl);
+        });
+    } else {
+        let lastIndex = 0;
+        const blocks = [];
+        
+        currentState.segments.forEach((seg, i) => {
+            if (seg.text) {
+                let foundIndex = -1;
+                if (originalTranscription !== "") {
+                    foundIndex = originalTranscription.indexOf(seg.text, lastIndex);
+                    if (foundIndex === -1) {
+                        foundIndex = originalTranscription.indexOf(seg.text);
+                    }
+                }
+                
+                if (foundIndex !== -1) {
+                    if (foundIndex > lastIndex) {
+                        blocks.push({
+                            type: 'unaligned',
+                            text: originalTranscription.substring(lastIndex, foundIndex)
+                        });
+                    }
+                    blocks.push({
+                        type: 'aligned',
+                        index: i,
+                        start: seg.start,
+                        end: seg.end,
+                        text: seg.text
+                    });
+                    lastIndex = foundIndex + seg.text.length;
+                } else {
+                    blocks.push({
+                        type: 'aligned',
+                        index: i,
+                        start: seg.start,
+                        end: seg.end,
+                        text: seg.text,
+                        orphan: true
+                    });
+                }
             }
+        });
+        
+        if (originalTranscription !== "" && lastIndex < originalTranscription.length) {
+            blocks.push({
+                type: 'unaligned',
+                text: originalTranscription.substring(lastIndex)
+            });
         }
         
-        listContainer.appendChild(blockEl);
-    });
+        blocks.forEach(block => {
+            const blockEl = document.createElement('div');
+            
+            if (block.type === 'aligned') {
+                blockEl.className = 'alignment-block aligned';
+                
+                const headerEl = document.createElement('div');
+                headerEl.className = 'block-header';
+                
+                const badgeEl = document.createElement('span');
+                badgeEl.className = 'block-badge';
+                badgeEl.innerText = `${translations[currentLang].seg_badge_prefix}${block.index + 1} (${block.start.toFixed(2)}s - ${block.end.toFixed(2)}s)`;
+                headerEl.appendChild(badgeEl);
+                
+                const actionsEl = document.createElement('div');
+                actionsEl.className = 'block-actions';
+                
+                const playBtn = document.createElement('button');
+                playBtn.className = 'brutalist-button block-btn';
+                playBtn.innerText = translations[currentLang].listen_btn;
+                playBtn.addEventListener('click', () => {
+                    playSegmentPreview(block.start, block.end, playBtn);
+                });
+                actionsEl.appendChild(playBtn);
+                
+                const jumpBtn = document.createElement('button');
+                jumpBtn.className = 'brutalist-button block-btn secondary-btn';
+                jumpBtn.innerText = translations[currentLang].jump_btn;
+                jumpBtn.addEventListener('click', () => {
+                    jumpToSegment(block.index);
+                });
+                actionsEl.appendChild(jumpBtn);
+                
+                headerEl.appendChild(actionsEl);
+                blockEl.appendChild(headerEl);
+                
+                const textEl = document.createElement('div');
+                textEl.className = 'block-text';
+                textEl.innerText = block.text;
+                blockEl.appendChild(textEl);
+                
+            } else {
+                blockEl.className = 'alignment-block unaligned';
+                
+                const headerEl = document.createElement('div');
+                headerEl.className = 'block-header';
+                
+                const badgeEl = document.createElement('span');
+                badgeEl.className = 'block-badge unaligned-badge';
+                badgeEl.innerText = translations[currentLang].remaining_text;
+                headerEl.appendChild(badgeEl);
+                
+                blockEl.appendChild(headerEl);
+                
+                const textEl = document.createElement('div');
+                textEl.className = 'block-text';
+                textEl.innerText = block.text.trim();
+                
+                if (textEl.innerText.length > 0) {
+                    blockEl.appendChild(textEl);
+                } else {
+                    return;
+                }
+            }
+            
+            listContainer.appendChild(blockEl);
+        });
+    }
     
     body.appendChild(listContainer);
 }
@@ -768,158 +924,59 @@ function renderCompletionOverview() {
     
     body.innerHTML = '';
     
-    let lastIndex = 0;
-    const blocks = [];
-    
-    currentState.segments.forEach((seg, i) => {
-        if (seg.text) {
-            let foundIndex = originalTranscription.indexOf(seg.text, lastIndex);
-            
-            if (foundIndex === -1) {
-                foundIndex = originalTranscription.indexOf(seg.text);
-            }
-            
-            if (foundIndex !== -1) {
-                if (foundIndex > lastIndex) {
-                    blocks.push({
-                        type: 'unaligned',
-                        text: originalTranscription.substring(lastIndex, foundIndex)
-                    });
-                }
-                blocks.push({
-                    type: 'aligned',
-                    index: i,
-                    start: seg.start,
-                    end: seg.end,
-                    text: seg.text
-                });
-                lastIndex = foundIndex + seg.text.length;
-            } else {
-                blocks.push({
-                    type: 'aligned',
-                    index: i,
-                    start: seg.start,
-                    end: seg.end,
-                    text: seg.text,
-                    orphan: true
-                });
-            }
-        }
-    });
-    
-    if (lastIndex < originalTranscription.length) {
-        blocks.push({
-            type: 'unaligned',
-            text: originalTranscription.substring(lastIndex)
-        });
-    }
-    
-    if (blocks.length === 0) {
-        body.innerHTML = `<div style="text-align: center; padding: 40px; font-weight: 800; font-size: 1.2rem;">${translations[currentLang].no_alignments_yet}</div>`;
-        return;
-    }
-    
     const listContainer = document.createElement('div');
     listContainer.className = 'alignments-list';
     
-    blocks.forEach(block => {
+    currentState.segments.forEach((seg, i) => {
         const blockEl = document.createElement('div');
+        blockEl.className = 'alignment-block aligned';
+        blockEl.style.boxShadow = '4px 4px 0px var(--border-color)';
         
-        if (block.type === 'aligned') {
-            blockEl.className = 'alignment-block aligned';
-            
-            const headerEl = document.createElement('div');
-            headerEl.className = 'block-header';
-            
-            const badgeEl = document.createElement('span');
-            badgeEl.className = 'block-badge';
-            badgeEl.innerText = `${translations[currentLang].seg_badge_prefix}${block.index + 1} (${block.start.toFixed(2)}s - ${block.end.toFixed(2)}s)`;
-            headerEl.appendChild(badgeEl);
-            
-            const actionsEl = document.createElement('div');
-            actionsEl.className = 'block-actions';
-            
-            const playBtn = document.createElement('button');
-            playBtn.className = 'brutalist-button block-btn';
-            playBtn.innerText = translations[currentLang].listen_btn;
-            playBtn.addEventListener('click', () => {
-                playSegmentPreview(block.start, block.end, playBtn);
-            });
-            actionsEl.appendChild(playBtn);
-            
-            const jumpBtn = document.createElement('button');
-            jumpBtn.className = 'brutalist-button block-btn secondary-btn';
-            jumpBtn.innerText = translations[currentLang].correct_btn;
-            jumpBtn.addEventListener('click', () => {
-                closeCompletionModal();
-                jumpToSegment(block.index);
-            });
-            actionsEl.appendChild(jumpBtn);
-            
-            headerEl.appendChild(actionsEl);
-            blockEl.appendChild(headerEl);
-            
+        const headerEl = document.createElement('div');
+        headerEl.className = 'block-header';
+        
+        const badgeEl = document.createElement('span');
+        badgeEl.className = 'block-badge';
+        badgeEl.innerText = `${translations[currentLang].seg_badge_prefix}${i + 1} (${seg.start.toFixed(2)}s - ${seg.end.toFixed(2)}s)`;
+        headerEl.appendChild(badgeEl);
+        
+        const actionsEl = document.createElement('div');
+        actionsEl.className = 'block-actions';
+        
+        const playBtn = document.createElement('button');
+        playBtn.className = 'brutalist-button block-btn';
+        playBtn.innerText = translations[currentLang].listen_btn;
+        playBtn.addEventListener('click', () => {
+            playSegmentPreview(seg.start, seg.end, playBtn);
+        });
+        actionsEl.appendChild(playBtn);
+        
+        const jumpBtn = document.createElement('button');
+        jumpBtn.className = 'brutalist-button block-btn secondary-btn';
+        jumpBtn.innerText = translations[currentLang].correct_btn;
+        jumpBtn.addEventListener('click', () => {
+            closeCompletionModal();
+            jumpToSegment(i);
+        });
+        actionsEl.appendChild(jumpBtn);
+        
+        headerEl.appendChild(actionsEl);
+        blockEl.appendChild(headerEl);
+        
+        if (config.project_type !== 'segmentation') {
             const textEl = document.createElement('div');
             textEl.className = 'block-text';
-            textEl.innerText = block.text;
+            textEl.innerText = seg.text || '';
             blockEl.appendChild(textEl);
-            
-        } else {
-            blockEl.className = 'alignment-block unaligned';
-            
-            const headerEl = document.createElement('div');
-            headerEl.className = 'block-header';
-            
-            const badgeEl = document.createElement('span');
-            badgeEl.className = 'block-badge unaligned-badge';
-            badgeEl.innerText = translations[currentLang].remaining_text;
-            headerEl.appendChild(badgeEl);
-            
-            blockEl.appendChild(headerEl);
-            
-            const textEl = document.createElement('div');
-            textEl.className = 'block-text';
-            textEl.innerText = block.text.trim();
-            
-            if (textEl.innerText.length > 0) {
-                blockEl.appendChild(textEl);
-            } else {
-                return;
-            }
         }
         
         listContainer.appendChild(blockEl);
     });
     
     body.appendChild(listContainer);
-}
-
-function toggleLanguage() {
-    currentLang = currentLang === 'en' ? 'es' : 'en';
-    localStorage.setItem('aligner_lang', currentLang);
-    updateLanguageUI();
-}
-
-function updateLanguageUI() {
-    const langBtn = document.getElementById('lang-toggle-btn');
-    if (langBtn) {
-        langBtn.innerText = currentLang === 'en' ? '🌐 ES' : '🌐 EN';
-    }
-
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if (translations[currentLang] && translations[currentLang][key]) {
-            el.innerText = translations[currentLang][key];
-        }
-    });
-
-    document.querySelectorAll('.project-segments-status').forEach(el => {
-        const completed = el.getAttribute('data-completed');
-        const total = el.getAttribute('data-total');
-        el.innerText = `${completed} / ${total} ${translations[currentLang].segments_aligned}`;
-    });
-
-    if (config) {
-        renderTranscription();
+    
+    // Refresh translation labels dynamically in the completion modal
+    if (window.updateLanguageUI) {
+        window.updateLanguageUI();
     }
 }

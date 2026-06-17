@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  aligner:
+    build: .
+    container_name: audio-aligner
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./aligner.db:/app/aligner.db
+    environment:
+      - FLASK_ENV=production
+    restart: always

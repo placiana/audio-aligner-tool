@@ -1,197 +1,228 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends 'base.html' %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Aligner</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
-</head>
+{% block title %}Editor - Audio Aligner{% endblock %}
 
-<body>
-    <div id="app">
-        <header>
-            <div class="header-left">
-                <h1 data-i18n="title">Audio Aligner</h1>
-                <div id="nav-controls">
-                    <a href="/" class="brutalist-button button-link" data-i18n="back_to_list">Back to List</a>
+{% block extra_head %}
+<script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+<script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
+{% endblock %}
+
+{% block header_middle %}
+<div id="progress-container">
+    <div id="progress-bar"></div>
+    <span id="progress-text">0%</span>
+</div>
+{% endblock %}
+
+{% block header_actions %}
+<button id="reset-seg-btn" class="brutalist-button danger-btn" style="display: none;" data-i18n="reset_btn">Reset</button>
+<button id="save-btn" class="brutalist-button" data-i18n="save_btn">Save</button>
+{% endblock %}
+
+{% block content %}
+<div id="editor-container" style="margin-top: 10px;">
+    <!-- Stage 1: Segmentation -->
+    <div id="stage1" class="stage brutalist-card" style="background: white;">
+        <h2 data-i18n="stage1_title" style="margin-top: 0; font-size: 22px; font-weight: 900; text-transform: uppercase;">Stage 1: Segmentation</h2>
+        <div class="audio-metadata">
+            <span><span data-i18n="file_label">File:</span> {{ selected_config.audio_path.split('/')[-1] }}</span>
+            <span><span data-i18n="duration_label">Duration:</span> <span id="total-duration">--:--</span></span>
+        </div>
+        
+        <!-- Zoom controls -->
+        <div class="zoom-container" style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px; background: #f3f4f6; padding: 10px; border: 2.5px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color); font-weight: 800; font-size: 13px;">
+            <label style="text-transform: uppercase;">🔍 Waveform Zoom:</label>
+            <input type="range" id="zoom-slider-stage1" min="10" max="250" value="20" style="width: 250px; cursor: pointer;">
+            <span id="zoom-value-stage1">20 px/s</span>
+        </div>
+
+        <div id="waveform-full"></div>
+
+        <div class="segmentation-settings" style="flex-wrap: wrap; background: #eff6ff; padding: 20px; border: 2.5px solid var(--border-color); box-shadow: 3px 3px 0px var(--border-color); margin-top: 25px;">
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px; width: 100%;">
+                <div class="input-group" style="display: flex; flex-direction: column; gap: 5px;">
+                    <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="target_duration">Target Segment (s):</label>
+                    <input type="number" id="target-duration-input" class="brutalist-input" value="25" min="5" max="120" style="background: white;">
+                </div>
+                
+                <div class="input-group" style="display: flex; flex-direction: column; gap: 5px;">
+                    <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;">Min Silence (ms):</label>
+                    <input type="number" id="silence-ms-input" class="brutalist-input" value="500" min="100" max="5000" style="background: white;">
+                </div>
+                
+                <div class="input-group" style="display: flex; flex-direction: column; gap: 5px;">
+                    <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;">Silence Threshold (dB):</label>
+                    <input type="number" id="silence-db-input" class="brutalist-input" value="-20" min="-100" max="0" style="background: white;">
                 </div>
             </div>
-
-            {% if selected_config %}
-            <div id="progress-container">
-                <div id="progress-bar"></div>
-                <span id="progress-text">0%</span>
-            </div>
-            {% endif %}
-
-            <div class="header-right">
-                <div class="header-actions" style="display: flex; gap: 10px; align-items: center;">
-                    <button id="lang-toggle-btn" class="brutalist-button secondary-btn" style="padding: 8px 16px; font-weight: 800; font-size: 13px; box-shadow: 2px 2px 0px var(--border-color);">🌐 EN</button>
-                    {% if selected_config %}
-                    <button id="reset-seg-btn" class="brutalist-button danger-btn" style="display: none;" data-i18n="reset_btn">Reset</button>
-                    <button id="save-btn" class="brutalist-button" data-i18n="save_btn">Save</button>
+            
+            <div style="display: flex; gap: 15px; width: 100%;">
+                <button id="detect-btn" class="brutalist-button" data-i18n="detect_btn" style="background: var(--accent-tertiary);">Detect Segments</button>
+                <div id="segmentation-loader" class="loader" style="display: none; align-self: center;"></div>
+                <button id="confirm-segments-btn" class="brutalist-button" data-i18n="confirm_btn_{{ selected_config.project_type }}" style="margin-left: auto;">
+                    {% if selected_config.project_type == 'segmentation' %}
+                        Confirm & Segment
+                    {% elif selected_config.project_type == 'transcription' %}
+                        Confirm & Transcribe
+                    {% else %}
+                        Confirm & Align
                     {% endif %}
-                </div>
-            </div>
-        </header>
-
-        {% if not selected_config %}
-        <div class="welcome brutalist-card" style="margin: 40px auto;">
-            <div class="main-actions"
-                style="margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid var(--border-color); padding-bottom: 20px; flex-wrap: wrap; gap: 15px;">
-                <h2 style="margin: 0; font-size: 22px; font-weight: 800;" data-i18n="welcome_title">Select an audio to process</h2>
-                <a href="/api/download_database" class="brutalist-button button-link" id="download-db-btn" data-i18n="download_db"
-                    style="background: var(--accent-secondary); text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; box-shadow: 3px 3px 0px var(--border-color); padding: 8px 16px;">
-                    📥 Download Consolidated Database (JSON)
-                </a>
-            </div>
-            <div class="project-list">
-                {% for p in projects %}
-                <div class="project-item">
-                    <div class="project-info">
-                        <strong>{{ p.audio_path.split('/')[-1] }}</strong>
-                        <span class="project-segments-status" data-completed="{{ p.completed_count }}" data-total="{{ p.total_count }}">{{ p.completed_count }} / {{ p.total_count }} segments aligned</span>
-                    </div>
-                    <div class="project-progress-mini">
-                        <div class="mini-bar" style="width: {{ p.progress }}%"></div>
-                    </div>
-                    <a href="/?p={{ p.idx }}" class="brutalist-button" data-i18n="open_btn">Open</a>
-                </div>
-                {% endfor %}
+                </button>
             </div>
         </div>
-        {% else %}
-        <!-- Stage 1: Segmentation -->
-        <div id="stage1" class="stage brutalist-card">
-            <h2 data-i18n="stage1_title">Stage 1: Segmentation</h2>
-            <div class="audio-metadata">
-                <span><span data-i18n="file_label">File:</span> {{ selected_config.audio_path.split('/')[-1] }}</span>
-                <span><span data-i18n="duration_label">Duration:</span> <span id="total-duration">--:--</span></span>
-            </div>
-            <div id="waveform-full"></div>
-            <div class="segmentation-settings">
-                <div class="input-group">
-                    <label data-i18n="target_duration">Target (s):</label>
-                    <input type="number" id="target-duration-input" class="brutalist-input" value="25" min="5"
-                        max="120">
-                </div>
-                <button id="detect-btn" class="brutalist-button" data-i18n="detect_btn">Detect Segments</button>
-                <div id="segmentation-loader" class="loader" style="display: none;"></div>
-                <button id="confirm-segments-btn" class="brutalist-button" data-i18n="confirm_btn">Confirm & Align</button>
-            </div>
-        </div>
-
-        <!-- Stage 2: Alignment -->
-        <div id="stage2" class="stage">
-            <div class="split-layout">
-                <div class="left-panel brutalist-card">
-                    <h3 data-i18n="current_segment_title">Current Segment</h3>
-                    <div id="waveform-segment"></div>
-                    <div id="segment-info">
-                        <span data-i18n="duration_label">Duration:</span> <span id="segment-duration">0.00</span>s
-                    </div>
-                    <div class="segment-controls">
-                        <button id="play-segment-btn" class="brutalist-button" data-i18n="play_pause">Play/Pause</button>
-                        <div class="speed-controls">
-                            <button class="brutalist-button speed-btn active" data-speed="1">1x</button>
-                            <button class="brutalist-button speed-btn" data-speed="1.5">1.5x</button>
-                            <button class="brutalist-button speed-btn" data-speed="2">2x</button>
-                        </div>
-                        <p style="font-size: 0.9em; margin: 0 10px;">
-                            <span data-i18n="seg_label">Seg.</span> <span id="current-segment-idx">0</span> / <span id="total-segments">0</span>
-                        </p>
-                    </div>
-                    <div class="navigation-controls">
-                        <button id="prev-btn" class="brutalist-button nav-large" data-i18n="prev_btn">Previous</button>
-                        <button id="next-btn" class="brutalist-button nav-large" data-i18n="next_btn">Next</button>
-                    </div>
-                </div>
-                <div class="right-panel brutalist-card">
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3 style="margin: 0;" data-i18n="transcription_title">Transcription</h3>
-                        <button id="show-alignments-btn" class="brutalist-button secondary-btn" data-i18n="show_alignments"
-                            style="padding: 6px 12px; font-size: 12px; box-shadow: 2px 2px 0px var(--border-color);">
-                            View Alignments
-                        </button>
-                    </div>
-                    <div id="text-container" class="text-editor">
-                        <!-- Full text will be loaded here -->
-                    </div>
-                    <div class="alignment-actions" style="margin-top: 20px;">
-                        <button id="assign-btn" class="brutalist-button" style="width: 100%; border-radius: 20px;" data-i18n="assign_highlight_btn">
-                            Assign Highlight (Ctrl + Enter)
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal for Alignments Overview -->
-        <div id="alignments-modal" class="brutalist-modal" style="display: none;">
-            <div class="brutalist-modal-content brutalist-card">
-                <div class="modal-header">
-                    <h2 data-i18n="alignments_modal_title">Created Alignments</h2>
-                    <button id="close-modal-btn" class="brutalist-button danger-btn modal-close-x">✕</button>
-                </div>
-                <div class="modal-body" id="modal-alignments-body">
-                    <!-- Alignments blocks will be dynamically rendered here -->
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal for Completion Screen -->
-        <div id="completion-modal" class="brutalist-modal" style="display: none;">
-            <div class="brutalist-modal-content brutalist-card"
-                style="max-width: 800px; height: 90vh; max-height: 90vh;">
-                <div class="modal-header" style="background: var(--accent-secondary);">
-                    <h2 style="margin: 0; font-size: 24px;" data-i18n="completion_title">🎉 AUDIO ALIGNED SUCCESSFULLY!</h2>
-                    <button id="close-completion-btn" class="brutalist-button danger-btn modal-close-x">✕</button>
-                </div>
-                <div class="modal-body"
-                    style="display: flex; flex-direction: column; gap: 20px; overflow-y: auto; padding: 25px;">
-                    <div class="brutalist-card"
-                        style="background: white; border: 2.5px solid var(--border-color); padding: 20px; box-shadow: 4px 4px 0px var(--border-color); text-align: center;">
-                        <h3 style="margin-top: 0; font-size: 20px; color: var(--text-color);" data-i18n="completion_congrats">Excellent work! You have completed the alignment of this audio.</h3>
-                        <p style="font-size: 16px; margin: 10px 0 20px 0; color: #555;" data-i18n="completion_instructions">Review each aligned segment below, listen to the previews to verify synchronization, or return to the list to process a new file.</p>
-
-                        <div class="completion-actions"
-                            style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
-                            <a href="/" class="brutalist-button button-link" data-i18n="completion_home"
-                                style="background: var(--accent-color); padding: 10px 20px; font-weight: 800; text-decoration: none; box-shadow: 4px 4px 0px var(--border-color);">
-                                🏠 Return to Main List
-                            </a>
-                            <button id="completion-review-btn" class="brutalist-button" data-i18n="completion_review"
-                                style="background: white; padding: 10px 20px; font-weight: 800; box-shadow: 4px 4px 0px var(--border-color);">
-                                🔍 Return to Editor
-                            </button>
-                        </div>
-                    </div>
-
-                    <h3 style="margin: 10px 0 0 0; font-size: 18px; text-transform: uppercase;" data-i18n="completion_preview_title">Alignments Preview</h3>
-                    <div id="completion-alignments-body" class="alignments-list"
-                        style="display: flex; flex-direction: column; gap: 15px;">
-                        <!-- Aligned segment review cards will be rendered here dynamically -->
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
     </div>
 
-    <script>
-        const initialState = {{ state | tojson | safe if state else 'null' }};
-        const config = {{ selected_config | tojson | safe if selected_config else 'null' }};
-    </script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-</body>
+    <!-- Stage 2: Alignment -->
+    <div id="stage2" class="stage">
+        <div class="split-layout">
+            <div class="left-panel brutalist-card" style="background: white;">
+                <h3 data-i18n="current_segment_title" style="margin-top: 0; font-size: 20px; font-weight: 900; text-transform: uppercase; border-bottom: 2.5px solid var(--border-color); padding-bottom: 10px;">Current Segment</h3>
+                
+                <!-- Zoom controls -->
+                <div class="zoom-container" style="display: flex; align-items: center; gap: 12px; margin-bottom: 5px; font-weight: 800; font-size: 12px;">
+                    <label style="text-transform: uppercase;">🔍 Zoom:</label>
+                    <input type="range" id="zoom-slider-stage2" min="10" max="350" value="50" style="width: 150px; cursor: pointer;">
+                </div>
 
-</html>
+                <div id="waveform-segment"></div>
+                
+                <div id="segment-info" style="background: #fef9c3; padding: 12px; border: 2.5px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color); display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 14px;">
+                        <span>SEGMENT #<span id="current-segment-idx">0</span> / <span id="total-segments">0</span></span>
+                        <span><span data-i18n="duration_label">Duration:</span> <span id="segment-duration">0.00</span>s</span>
+                    </div>
+                    
+                    <!-- Re-segmentation fine-tuning buttons -->
+                    <div style="display: flex; gap: 10px; justify-content: center; align-items: center; border-top: 2px solid var(--border-color); padding-top: 10px;">
+                        <span style="font-weight: 800; font-size: 11px; text-transform: uppercase;">Fine-tune:</span>
+                        <div style="display: flex; gap: 4px;">
+                            <button id="adj-start-minus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;">Start -0.1s</button>
+                            <button id="adj-start-plus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;">Start +0.1s</button>
+                        </div>
+                        <div style="display: flex; gap: 4px; margin-left: 10px;">
+                            <button id="adj-end-minus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;">End -0.1s</button>
+                            <button id="adj-end-plus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;">End +0.1s</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="segment-controls" style="flex-wrap: wrap; gap: 15px;">
+                    <button id="play-segment-btn" class="brutalist-button" style="flex: 1; min-width: 80px; font-size: 1.3rem;">▶</button>
+                    <div class="speed-controls">
+                        <button class="brutalist-button speed-btn" data-speed="0.5">0.5x</button>
+                        <button class="brutalist-button speed-btn" data-speed="0.75">0.75x</button>
+                        <button class="brutalist-button speed-btn active" data-speed="1">1x</button>
+                        <button class="brutalist-button speed-btn" data-speed="1.5">1.5x</button>
+                        <button class="brutalist-button speed-btn" data-speed="2">2x</button>
+                    </div>
+                </div>
+                
+                <div class="navigation-controls">
+                    <button id="prev-btn" class="brutalist-button nav-large" data-i18n="prev_btn">Previous</button>
+                    <button id="next-btn" class="brutalist-button nav-large" data-i18n="next_btn">Next</button>
+                </div>
+            </div>
+
+            <!-- Transcription & Manual Entry Panel -->
+            <div class="right-panel brutalist-card" style="background: white;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0; font-size: 20px; font-weight: 900; text-transform: uppercase;" data-i18n="transcription_title">Transcription</h3>
+                    <button id="show-alignments-btn" class="brutalist-button secondary-btn" data-i18n="show_alignments" style="padding: 6px 12px; font-size: 12px; box-shadow: 2px 2px 0px var(--border-color);">
+                        View Alignments
+                    </button>
+                </div>
+                
+                <!-- Transcription highlight text editor (if text file loaded) -->
+                <div id="text-container" class="text-editor" style="display: none; height: 350px;">
+                    <!-- Full text will be loaded here -->
+                </div>
+                
+                <!-- Manual segment input (always visible, dynamically displays current segment text or permits direct typing) -->
+                <div id="manual-transcription-container" style="margin-top: 15px; background: #f3e8ff; padding: 15px; border: 2.5px solid var(--border-color); box-shadow: 3px 3px 0px var(--border-color); display: flex; flex-direction: column; gap: 8px;">
+                    <label style="font-weight: 900; font-size: 12px; text-transform: uppercase;">Active Segment Transcription text:</label>
+                    <textarea id="manual-transcription-input" class="brutalist-input" style="height: 100px; resize: none; font-family: inherit; font-size: 15px;" placeholder="Type transcription for this segment here..."></textarea>
+                </div>
+
+                <div class="alignment-actions" style="margin-top: 20px;">
+                    <button id="assign-btn" class="brutalist-button" style="width: 100%;" data-i18n="assign_highlight_btn">
+                        Assign Highlight (Ctrl + Enter)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Alignments Overview -->
+    <div id="alignments-modal" class="brutalist-modal" style="display: none;">
+        <div class="brutalist-modal-content brutalist-card">
+            <div class="modal-header">
+                <h2 data-i18n="alignments_modal_title">Created Alignments</h2>
+                <button id="close-modal-btn" class="brutalist-button danger-btn modal-close-x">✕</button>
+            </div>
+            <div class="modal-body" id="modal-alignments-body">
+                <!-- Alignments blocks will be dynamically rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Completion Screen -->
+    <div id="completion-modal" class="brutalist-modal" style="display: none;">
+        <div class="brutalist-modal-content brutalist-card" style="max-width: 800px; height: 90vh; max-height: 90vh;">
+            <div class="modal-header" style="background: var(--accent-secondary);">
+                <h2 style="margin: 0; font-size: 24px;" data-i18n="completion_title_{{ selected_config.project_type }}">
+                    {% if selected_config.project_type == 'segmentation' %}
+                        🎉 AUDIO SEGMENTED SUCCESSFULLY!
+                    {% elif selected_config.project_type == 'transcription' %}
+                        🎉 AUDIO TRANSCRIBED SUCCESSFULLY!
+                    {% else %}
+                        🎉 AUDIO ALIGNED SUCCESSFULLY!
+                    {% endif %}
+                </h2>
+                <button id="close-completion-btn" class="brutalist-button danger-btn modal-close-x">✕</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 20px; overflow-y: auto; padding: 25px;">
+                <div class="brutalist-card" style="background: white; border: 2.5px solid var(--border-color); padding: 20px; box-shadow: 4px 4px 0px var(--border-color); text-align: center;">
+                    <h3 style="margin-top: 0; font-size: 20px; color: var(--text-color);" id="completion-congrats" data-i18n="completion_congrats_{{ selected_config.project_type }}">
+                        {% if selected_config.project_type == 'segmentation' %}
+                            Excellent work! You have completed the segmentation of this audio.
+                        {% elif selected_config.project_type == 'transcription' %}
+                            Excellent work! You have completed the transcription of this audio.
+                        {% else %}
+                            Excellent work! You have completed the alignment of this audio.
+                        {% endif %}
+                    </h3>
+                    <p style="font-size: 16px; margin: 10px 0 20px 0; color: #555;" id="completion-instructions" data-i18n="completion_instructions_{{ selected_config.project_type }}">
+                        {% if selected_config.project_type == 'segmentation' %}
+                            Review each segment below, listen to the previews to verify, or return to the list to process a new file.
+                        {% elif selected_config.project_type == 'transcription' %}
+                            Review each transcribed segment below, listen to the previews to verify synchronization, or return to the list to process a new file.
+                        {% else %}
+                            Review each aligned segment below, listen to the previews to verify synchronization, or return to the list to process a new file.
+                        {% endif %}
+                    </p>
+
+                    <div class="completion-actions" style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+                        <a href="/project/{{ project_id }}" class="brutalist-button button-link" data-i18n="completion_home" style="background: var(--accent-color); padding: 10px 20px; font-weight: 800; text-decoration: none; box-shadow: 4px 4px 0px var(--border-color);">
+                            🏠 Back to Project Detail
+                        </a>
+                        <button id="completion-review-btn" class="brutalist-button" data-i18n="completion_review" style="background: white; padding: 10px 20px; font-weight: 800; box-shadow: 4px 4px 0px var(--border-color);">
+                            🔍 Return to Editor
+                        </button>
+                    </div>
+                </div>
+
+                <h3 style="margin: 10px 0 0 0; font-size: 18px; text-transform: uppercase;" data-i18n="completion_preview_title">Alignments Preview</h3>
+                <div id="completion-alignments-body" class="alignments-list" style="display: flex; flex-direction: column; gap: 15px;">
+                    <!-- Aligned segment review cards will be rendered here dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const initialState = {{ state | tojson | safe if state else 'null' }};
+    const config = {{ selected_config | tojson | safe if selected_config else 'null' }};
+</script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}Login - Audio Aligner{% endblock %}
+
+{% block content %}
+<div class="brutalist-card" style="max-width: 450px; margin: 60px auto; background: white;">
+    <h2 style="margin-top: 0; font-size: 24px; font-weight: 900; border-bottom: 2.5px solid var(--border-color); padding-bottom: 15px; text-transform: uppercase;" data-i18n="login_title">
+        Sign In
+    </h2>
+    <form method="post" action="/login" style="display: flex; flex-direction: column; gap: 20px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="username" style="font-weight: 800; font-size: 14px; text-transform: uppercase;" data-i18n="username_label">Username</label>
+            <input type="text" id="username" name="username" class="brutalist-input" required placeholder="Enter your username">
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="password" style="font-weight: 800; font-size: 14px; text-transform: uppercase;" data-i18n="password_label">Password</label>
+            <input type="password" id="password" name="password" class="brutalist-input" required placeholder="Enter your password">
+        </div>
+        
+        <button type="submit" class="brutalist-button" style="margin-top: 10px; width: 100%;" data-i18n="login_btn">
+            Sign In
+        </button>
+    </form>
+    
+    <p style="margin-top: 25px; font-weight: 700; text-align: center; font-size: 14px;">
+        <span data-i18n="new_user_prompt">New to Audio Aligner?</span> <a href="/register" style="color: var(--text-color); font-weight: 900; text-decoration: underline;" data-i18n="create_account_link">Create an account</a>
+    </p>
+</div>
+{% endblock %}
