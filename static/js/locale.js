@@ -1,4 +1,4 @@
-window.currentLang = localStorage.getItem('aligner_lang') || 'en';
+window.currentLang = localStorage.getItem('aligner_lang') || 'es';
 
 window.translations = {
     en: {

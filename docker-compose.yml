@@ -10,6 +10,7 @@ services:
     environment:
       - FLASK_ENV=production
       - DATABASE_FILE=/app/db/aligner.db
+      - ALLOW_REGISTRATION=true
     restart: always
 
   proxy:

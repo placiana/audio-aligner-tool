@@ -97,6 +97,8 @@ docker compose up -d --build
 The application will be running at `http://localhost:5000`. 
 Data directories (`uploads/`) and the database directory (`db/`) are bound as volumes on the host system to ensure persistence across container updates.
 
+Additionally, user registration can be disabled by setting the environment variable `ALLOW_REGISTRATION=false` in the `docker-compose.yml` file. If disabled, the registration link on the login page will be hidden, and direct access to `/register` will be blocked.
+
 ---
 
 ## Development Conventions

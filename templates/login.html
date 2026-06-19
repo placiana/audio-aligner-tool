@@ -23,8 +23,10 @@
         </button>
     </form>
     
+    {% if allow_registration %}
     <p style="margin-top: 25px; font-weight: 700; text-align: center; font-size: 14px;">
         <span data-i18n="new_user_prompt">New to Audio Aligner?</span> <a href="/register" style="color: var(--text-color); font-weight: 900; text-decoration: underline;" data-i18n="create_account_link">Create an account</a>
     </p>
+    {% endif %}
 </div>
 {% endblock %}

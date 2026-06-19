@@ -13,6 +13,12 @@ app.secret_key = 'aligner-secret-session-key' # Change to a secure random string
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+ALLOW_REGISTRATION = os.environ.get('ALLOW_REGISTRATION', 'true').lower() == 'true'
+
+@app.context_processor
+def inject_registration_status():
+    return dict(allow_registration=ALLOW_REGISTRATION)
+
 # Initialize SQLite database and tables
 database.init_db()
 
@@ -85,6 +91,10 @@ def login_required(view):
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if not ALLOW_REGISTRATION:
+        flash('El registro de nuevos usuarios está deshabilitado en este servidor.', 'error')
+        return redirect(url_for('login'))
+        
     if g.user:
         return redirect(url_for('dashboard'))
         
