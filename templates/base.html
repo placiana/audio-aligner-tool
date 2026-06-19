@@ -21,6 +21,9 @@
                 {% if g.user %}
                 <div id="nav-controls" style="display: flex; gap: 10px; align-items: center;">
                     <a href="/" class="brutalist-button button-link" style="padding: 6px 12px; font-size: 13px; box-shadow: 2px 2px 0px var(--border-color);" data-i18n="projects_nav">📂 Projects</a>
+                    {% if g.user.is_admin %}
+                    <a href="/admin" class="brutalist-button button-link" style="padding: 6px 12px; font-size: 13px; background: var(--accent-secondary); box-shadow: 2px 2px 0px var(--border-color);">⚙️ Admin</a>
+                    {% endif %}
                     <span style="font-weight: 800; font-size: 14px; margin-left: 10px;">👤 {{ g.user.username }}</span>
                 </div>
                 {% endif %}

@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Pista de Audio - Admin{% endblock %}
+
+{% block content %}
+<div class="brutalist-card" style="max-width: 700px; margin: 40px auto; background: white; border-radius: 0;">
+    <h2 style="margin-top: 0; font-size: 24px; font-weight: 900; border-bottom: 2.5px solid var(--border-color); padding-bottom: 15px; text-transform: uppercase;">
+        🎙️ Editar Pista de Audio
+    </h2>
+    <form method="post" style="display: flex; flex-direction: column; gap: 20px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="project_id" style="font-weight: 800; font-size: 14px; text-transform: uppercase;">Proyecto Asociado</label>
+            <select id="project_id" name="project_id" class="brutalist-input" style="background: white; cursor: pointer; font-family: inherit;">
+                {% for p in projects %}
+                <option value="{{ p.id }}" {% if item_to_edit.project_id == p.id %}selected{% endif %}>{{ p.name }} (Propietario: {{ p.owner_name }}, ID: {{ p.id }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="audio_path" style="font-weight: 800; font-size: 14px; text-transform: uppercase;">Ruta del Archivo de Audio</label>
+            <input type="text" id="audio_path" name="audio_path" class="brutalist-input" value="{{ item_to_edit.audio_path }}" required>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="text_path" style="font-weight: 800; font-size: 14px; text-transform: uppercase;">Ruta del Archivo de Texto (Opcional)</label>
+            <input type="text" id="text_path" name="text_path" class="brutalist-input" value="{{ item_to_edit.text_path or '' }}">
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="state_json" style="font-weight: 800; font-size: 14px; text-transform: uppercase;">Estado del Progreso (JSON)</label>
+            <textarea id="state_json" name="state_json" class="brutalist-input" style="height: 250px; font-family: monospace; font-size: 13px; resize: vertical;">{{ item_to_edit.state_json }}</textarea>
+            <span style="font-size: 11px; color: #666; font-weight: 600;">Nota: Debe ser un formato JSON válido que contenga la estructura de segmentos, índice actual, etc.</span>
+        </div>
+
+        <div style="display: flex; gap: 15px; margin-top: 10px;">
+            <button type="submit" class="brutalist-button" style="flex: 1; box-shadow: 2px 2px 0px var(--border-color);">
+                💾 Guardar Cambios
+            </button>
+            <a href="/admin" class="brutalist-button secondary-btn button-link" style="flex: 1; text-align: center; box-shadow: 2px 2px 0px var(--border-color);">
+                Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Proyecto - Admin{% endblock %}
+
+{% block content %}
+<div class="brutalist-card" style="max-width: 600px; margin: 40px auto; background: white; border-radius: 0;">
+    <h2 style="margin-top: 0; font-size: 24px; font-weight: 900; border-bottom: 2.5px solid var(--border-color); padding-bottom: 15px; text-transform: uppercase;">
+        📁 Editar Proyecto
+    </h2>
+    <form method="post" style="display: flex; flex-direction: column; gap: 20px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="name" style="font-weight: 800; font-size: 14px; text-transform: uppercase;">Nombre del Proyecto</label>
+            <input type="text" id="name" name="name" class="brutalist-input" value="{{ project_to_edit.name }}" required>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="type" style="font-weight: 800; font-size: 14px; text-transform: uppercase;">Tipo de Proyecto</label>
+            <select id="type" name="type" class="brutalist-input" style="background: white; cursor: pointer; font-family: inherit;">
+                <option value="alignment" {% if project_to_edit.type == 'alignment' %}selected{% endif %}>Segmentación y Alineamiento (Audio + Texto)</option>
+                <option value="transcription" {% if project_to_edit.type == 'transcription' %}selected{% endif %}>Segmentación y Transcripción (Audio)</option>
+                <option value="segmentation" {% if project_to_edit.type == 'segmentation' %}selected{% endif %}>Solo segmentación (Audio)</option>
+            </select>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="user_id" style="font-weight: 800; font-size: 14px; text-transform: uppercase;">Propietario</label>
+            <select id="user_id" name="user_id" class="brutalist-input" style="background: white; cursor: pointer; font-family: inherit;">
+                {% for u in users %}
+                <option value="{{ u.id }}" {% if project_to_edit.user_id == u.id %}selected{% endif %}>{{ u.username }} (ID: {{ u.id }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="description" style="font-weight: 800; font-size: 14px; text-transform: uppercase;">Descripción</label>
+            <textarea id="description" name="description" class="brutalist-input" style="height: 100px; resize: none; font-family: inherit;">{{ project_to_edit.description or '' }}</textarea>
+        </div>
+
+        <div style="display: flex; gap: 15px; margin-top: 10px;">
+            <button type="submit" class="brutalist-button" style="flex: 1; box-shadow: 2px 2px 0px var(--border-color);">
+                💾 Guardar Cambios
+            </button>
+            <a href="/admin" class="brutalist-button secondary-btn button-link" style="flex: 1; text-align: center; box-shadow: 2px 2px 0px var(--border-color);">
+                Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

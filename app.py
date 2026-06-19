@@ -87,6 +87,17 @@ def login_required(view):
         return view(**kwargs)
     return wrapped_view
 
+def admin_required(view):
+    @functools.wraps(view)
+    def wrapped_view(**kwargs):
+        if g.user is None:
+            return redirect(url_for('login'))
+        if not g.user.get('is_admin'):
+            flash('Acceso denegado: Se requieren permisos de administrador.', 'error')
+            return redirect(url_for('dashboard'))
+        return view(**kwargs)
+    return wrapped_view
+
 # --- Auth Routes ---
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -482,6 +493,112 @@ def export_json(item_id):
         as_attachment=True, 
         download_name=download_name
     )
+
+# --- Admin CRUD Routes ---
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    users = database.list_all_users()
+    projects = database.list_all_projects_admin()
+    items = database.list_all_audio_items_admin()
+    return render_template('admin/dashboard.html', users=users, projects=projects, items=items)
+
+# Users CRUD
+@app.route('/admin/users/<int:user_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_edit_user(user_id):
+    if request.method == 'POST':
+        username = request.form.get('username')
+        is_admin = int(request.form.get('is_admin', 0))
+        if not username:
+            flash('El nombre de usuario es requerido.', 'error')
+        else:
+            database.update_user_admin(user_id, username, is_admin)
+            flash('Usuario actualizado con éxito.', 'success')
+            return redirect(url_for('admin_dashboard'))
+            
+    u = database.get_user_by_id(user_id)
+    if not u:
+        flash('Usuario no encontrado.', 'error')
+        return redirect(url_for('admin_dashboard'))
+    return render_template('admin/edit_user.html', user_to_edit=u)
+
+@app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_user(user_id):
+    if user_id == g.user['id']:
+        flash('No puedes eliminarte a ti mismo.', 'error')
+    else:
+        database.delete_user_admin(user_id)
+        flash('Usuario eliminado.', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+# Projects CRUD
+@app.route('/admin/projects/<int:project_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_edit_project(project_id):
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        project_type = request.form.get('type')
+        user_id = int(request.form.get('user_id'))
+        
+        if not name:
+            flash('El nombre del proyecto es requerido.', 'error')
+        else:
+            database.update_project_admin(project_id, name, description, project_type, user_id)
+            flash('Proyecto actualizado con éxito.', 'success')
+            return redirect(url_for('admin_dashboard'))
+            
+    p = database.get_project_admin(project_id)
+    if not p:
+        flash('Proyecto no encontrado.', 'error')
+        return redirect(url_for('admin_dashboard'))
+    users = database.list_all_users()
+    return render_template('admin/edit_project.html', project_to_edit=p, users=users)
+
+@app.route('/admin/projects/<int:project_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_project(project_id):
+    database.delete_project_admin(project_id)
+    flash('Proyecto eliminado.', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+# Audio Items CRUD
+@app.route('/admin/audio-items/<int:item_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_edit_audio_item(item_id):
+    if request.method == 'POST':
+        project_id = int(request.form.get('project_id'))
+        audio_path = request.form.get('audio_path')
+        text_path = request.form.get('text_path')
+        state_json = request.form.get('state_json')
+        
+        if not audio_path:
+            flash('La ruta del audio es requerida.', 'error')
+        else:
+            try:
+                json.loads(state_json) if state_json else "{}"
+                database.update_audio_item_admin(item_id, project_id, audio_path, text_path, state_json)
+                flash('Pista de audio actualizada con éxito.', 'success')
+                return redirect(url_for('admin_dashboard'))
+            except ValueError:
+                flash('El formato de state_json no es un JSON válido.', 'error')
+                
+    item = database.get_audio_item(item_id)
+    if not item:
+        flash('Pista de audio no encontrada.', 'error')
+        return redirect(url_for('admin_dashboard'))
+    projects = database.list_all_projects_admin()
+    return render_template('admin/edit_audio_item.html', item_to_edit=item, projects=projects)
+
+@app.route('/admin/audio-items/<int:item_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_audio_item(item_id):
+    database.delete_audio_item(item_id)
+    flash('Pista de audio eliminada.', 'success')
+    return redirect(url_for('admin_dashboard'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

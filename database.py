@@ -25,6 +25,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
+            is_admin INTEGER NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     ''')
@@ -55,6 +56,12 @@ def init_db():
         );
     ''')
     
+    # Check if 'is_admin' column exists in 'users' table (migration for existing database files)
+    cursor.execute("PRAGMA table_info(users);")
+    columns = [row['name'] for row in cursor.fetchall()]
+    if 'is_admin' not in columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;")
+        
     # Check if 'type' column exists in 'projects' table (migration for existing database files)
     cursor.execute("PRAGMA table_info(projects);")
     columns = [row['name'] for row in cursor.fetchall()]
@@ -71,9 +78,13 @@ def create_user(username, password):
     cursor = conn.cursor()
     password_hash = generate_password_hash(password)
     try:
+        cursor.execute('SELECT COUNT(*) FROM users')
+        user_count = cursor.fetchone()[0]
+        is_admin = 1 if user_count == 0 else 0
+        
         cursor.execute(
-            'INSERT INTO users (username, password_hash) VALUES (?, ?)',
-            (username, password_hash)
+            'INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)',
+            (username, password_hash, is_admin)
         )
         conn.commit()
         user_id = cursor.lastrowid
@@ -193,3 +204,93 @@ def delete_audio_item(item_id):
     cursor.execute('DELETE FROM audio_items WHERE id = ?', (item_id,))
     conn.commit()
     conn.close()
+
+# --- Admin CRUD Functions ---
+
+def list_all_users():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, username, is_admin, created_at FROM users ORDER BY username ASC')
+    users = cursor.fetchall()
+    conn.close()
+    return [dict(u) for u in users]
+
+def update_user_admin(user_id, username, is_admin):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        'UPDATE users SET username = ?, is_admin = ? WHERE id = ?',
+        (username, is_admin, user_id)
+    )
+    conn.commit()
+    conn.close()
+
+def delete_user_admin(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+
+def list_all_projects_admin():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT p.*, u.username as owner_name 
+        FROM projects p 
+        LEFT JOIN users u ON p.user_id = u.id 
+        ORDER BY p.created_at DESC
+    ''')
+    projects = cursor.fetchall()
+    conn.close()
+    return [dict(p) for p in projects]
+
+def update_project_admin(project_id, name, description, project_type, user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        'UPDATE projects SET name = ?, description = ?, type = ?, user_id = ? WHERE id = ?',
+        (name, description, project_type, user_id, project_id)
+    )
+    conn.commit()
+    conn.close()
+
+def delete_project_admin(project_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM projects WHERE id = ?', (project_id,))
+    conn.commit()
+    conn.close()
+
+def list_all_audio_items_admin():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT a.*, p.name as project_name 
+        FROM audio_items a 
+        LEFT JOIN projects p ON a.project_id = p.id 
+        ORDER BY a.created_at DESC
+    ''')
+    items = cursor.fetchall()
+    conn.close()
+    return [dict(i) for i in items]
+
+def update_audio_item_admin(item_id, project_id, audio_path, text_path, state_json):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        'UPDATE audio_items SET project_id = ?, audio_path = ?, text_path = ?, state_json = ? WHERE id = ?',
+        (project_id, audio_path, text_path, state_json, item_id)
+    )
+    conn.commit()
+    conn.close()
+
+def get_project_admin(project_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM projects WHERE id = ?', (project_id,))
+    project = cursor.fetchone()
+    conn.close()
+    if project:
+        return dict(project)
+    return None

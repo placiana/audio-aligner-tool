@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+
+{% block title %}Panel de Administración - Audio Aligner{% endblock %}
+
+{% block content %}
+<div class="brutalist-card" style="background: var(--accent-color); margin-bottom: 30px; border-radius: 0;">
+    <h1 style="margin: 0; font-size: 28px; font-weight: 900; text-transform: uppercase;">⚙️ Panel de Administración</h1>
+    <p style="margin: 5px 0 0 0; font-weight: 700;">Gestión interna de Usuarios, Proyectos y Pistas de Audio (ABM)</p>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 30px;">
+    
+    <!-- Users Section -->
+    <div class="brutalist-card" style="background: white; border-radius: 0;">
+        <h2 style="margin-top: 0; font-size: 22px; font-weight: 900; text-transform: uppercase; border-bottom: 2.5px solid var(--border-color); padding-bottom: 15px;">
+            👥 Usuarios
+        </h2>
+        <div style="overflow-x: auto; margin-top: 15px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-weight: 700;">
+                <thead>
+                    <tr style="border-bottom: 3px solid var(--border-color); background: #eee;">
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color);">ID</th>
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color);">Usuario</th>
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color);">Admin?</th>
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color);">Creado</th>
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color); text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr style="border-bottom: 2.5px solid var(--border-color);">
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color);">{{ u.id }}</td>
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color);">{{ u.username }}</td>
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color);">
+                            {% if u.is_admin %}
+                            <span style="background: var(--accent-secondary); padding: 4px 8px; border: 1.5px solid var(--border-color); font-size: 12px; font-weight: 900;">SÍ</span>
+                            {% else %}
+                            <span style="background: #ddd; padding: 4px 8px; border: 1.5px solid var(--border-color); font-size: 12px; color: #555;">NO</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color);">{{ u.created_at }}</td>
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color); display: flex; gap: 10px; justify-content: center; align-items: center;">
+                            <a href="/admin/users/{{ u.id }}/edit" class="brutalist-button button-link" style="padding: 6px 12px; font-size: 12px; box-shadow: 2px 2px 0px var(--border-color); background: var(--accent-tertiary);">Editar</a>
+                            {% if u.id != g.user.id %}
+                            <form method="post" action="/admin/users/{{ u.id }}/delete" onsubmit="return confirm('¿Estás seguro de que deseas eliminar este usuario y todos sus proyectos/datos asociados?');" style="margin: 0;">
+                                <button type="submit" class="brutalist-button danger-btn" style="padding: 6px 12px; font-size: 12px; box-shadow: 2px 2px 0px var(--border-color);">Eliminar</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Projects Section -->
+    <div class="brutalist-card" style="background: white; border-radius: 0;">
+        <h2 style="margin-top: 0; font-size: 22px; font-weight: 900; text-transform: uppercase; border-bottom: 2.5px solid var(--border-color); padding-bottom: 15px;">
+            📁 Proyectos
+        </h2>
+        <div style="overflow-x: auto; margin-top: 15px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-weight: 700;">
+                <thead>
+                    <tr style="border-bottom: 3px solid var(--border-color); background: #eee;">
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color);">ID</th>
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color);">Nombre</th>
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color);">Tipo</th>
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color);">Propietario</th>
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color);">Creado</th>
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color); text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in projects %}
+                    <tr style="border-bottom: 2.5px solid var(--border-color);">
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color);">{{ p.id }}</td>
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color);">
+                            <strong>{{ p.name }}</strong>
+                            {% if p.description %}
+                            <div style="font-size: 12px; color: #666; font-weight: 600; margin-top: 3px;">{{ p.description }}</div>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color); font-size: 13px;">
+                            {% if p.type == 'alignment' %}
+                            Alineamiento (Audio+Texto)
+                            {% elif p.type == 'transcription' %}
+                            Transcripción (Audio)
+                            {% else %}
+                            Segmentación (Audio)
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color);">
+                            👤 {{ p.owner_name or 'Sin propietario' }} <span style="font-size: 11px; color: #888;">(ID: {{ p.user_id }})</span>
+                        </td>
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color);">{{ p.created_at }}</td>
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color); display: flex; gap: 10px; justify-content: center; align-items: center;">
+                            <a href="/admin/projects/{{ p.id }}/edit" class="brutalist-button button-link" style="padding: 6px 12px; font-size: 12px; box-shadow: 2px 2px 0px var(--border-color); background: var(--accent-tertiary);">Editar</a>
+                            <form method="post" action="/admin/projects/{{ p.id }}/delete" onsubmit="return confirm('¿Estás seguro de que deseas eliminar este proyecto y todas sus pistas de audio?');" style="margin: 0;">
+                                <button type="submit" class="brutalist-button danger-btn" style="padding: 6px 12px; font-size: 12px; box-shadow: 2px 2px 0px var(--border-color);">Eliminar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Audio Items Section -->
+    <div class="brutalist-card" style="background: white; border-radius: 0;">
+        <h2 style="margin-top: 0; font-size: 22px; font-weight: 900; text-transform: uppercase; border-bottom: 2.5px solid var(--border-color); padding-bottom: 15px;">
+            🎙️ Pistas de Audio
+        </h2>
+        <div style="overflow-x: auto; margin-top: 15px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-weight: 700;">
+                <thead>
+                    <tr style="border-bottom: 3px solid var(--border-color); background: #eee;">
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color);">ID</th>
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color);">Proyecto</th>
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color);">Rutas de Archivos</th>
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color);">Creado</th>
+                        <th style="padding: 12px; border: 2.5px solid var(--border-color); text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr style="border-bottom: 2.5px solid var(--border-color);">
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color);">{{ item.id }}</td>
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color);">
+                            📁 {{ item.project_name or 'Sin proyecto' }} <span style="font-size: 11px; color: #888;">(ID: {{ item.project_id }})</span>
+                        </td>
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color); font-size: 13px;">
+                            <div><strong>Audio:</strong> {{ item.audio_path }}</div>
+                            {% if item.text_path %}
+                            <div style="margin-top: 4px;"><strong>Texto:</strong> {{ item.text_path }}</div>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color);">{{ item.created_at }}</td>
+                        <td style="padding: 12px; border: 2.5px solid var(--border-color); display: flex; gap: 10px; justify-content: center; align-items: center;">
+                            <a href="/admin/audio-items/{{ item.id }}/edit" class="brutalist-button button-link" style="padding: 6px 12px; font-size: 12px; box-shadow: 2px 2px 0px var(--border-color); background: var(--accent-tertiary);">Editar</a>
+                            <form method="post" action="/admin/audio-items/{{ item.id }}/delete" onsubmit="return confirm('¿Estás seguro de que deseas eliminar esta pista de audio y todo su progreso de alineación?');" style="margin: 0;">
+                                <button type="submit" class="brutalist-button danger-btn" style="padding: 6px 12px; font-size: 12px; box-shadow: 2px 2px 0px var(--border-color);">Eliminar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
