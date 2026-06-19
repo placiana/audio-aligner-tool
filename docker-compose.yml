@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   aligner:
     build: .
@@ -13,3 +11,21 @@ services:
       - FLASK_ENV=production
       - DATABASE_FILE=/app/db/aligner.db
     restart: always
+
+proxy:
+  image: caddy:2-alpine
+  container_name: caddy-proxy
+  ports:
+    - "80:80"
+    - "443:443"
+  volumes:
+    - ./Caddyfile:/etc/caddy/Caddyfile
+    - caddy_data:/data
+    - caddy_config:/config
+  restart: always
+  depends_on:
+    - aligner
+
+volumes:
+  caddy_data:
+  caddy_config:

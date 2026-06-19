@@ -1,0 +1,3 @@
+catpower.exp.dc.uba.ar {
+  reverse_proxy aligner:5000
+}
