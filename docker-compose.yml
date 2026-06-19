@@ -8,7 +8,8 @@ services:
       - "5000:5000"
     volumes:
       - ./uploads:/app/uploads
-      - ./aligner.db:/app/aligner.db
+      - ./db:/app/db
     environment:
       - FLASK_ENV=production
+      - DATABASE_FILE=/app/db/aligner.db
     restart: always

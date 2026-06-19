@@ -3,9 +3,12 @@ import sqlite3
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
-DATABASE_FILE = 'aligner.db'
+DATABASE_FILE = os.environ.get('DATABASE_FILE', 'aligner.db')
 
 def get_db_connection():
+    db_dir = os.path.dirname(DATABASE_FILE)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
     conn = sqlite3.connect(DATABASE_FILE)
     conn.row_factory = sqlite3.Row
     # Enable foreign keys

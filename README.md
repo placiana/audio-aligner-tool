@@ -95,7 +95,7 @@ Start the containers in the background:
 docker compose up -d --build
 ```
 The application will be running at `http://localhost:5000`. 
-Data directories (`uploads/`) and database files (`aligner.db`) are bound as volumes on the host system to ensure persistence across container updates.
+Data directories (`uploads/`) and the database directory (`db/`) are bound as volumes on the host system to ensure persistence across container updates.
 
 ---
 

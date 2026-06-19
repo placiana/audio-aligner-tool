@@ -1,5 +1,10 @@
 FROM python:3.11-slim
 
+# Cambiar los mirrors de HTTP a HTTPS antes de actualizar
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/debian_version && \
+    sed -i 's|http://.*\.debian\.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources || true && \
+    if [ -f /etc/apt/sources.list ]; then sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list; fi
+
 # Install system dependencies (FFmpeg is required by pydub for audio conversion and slicing)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
