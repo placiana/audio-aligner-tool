@@ -294,3 +294,20 @@ def get_project_admin(project_id):
     if project:
         return dict(project)
     return None
+
+def create_user_admin(username, password, is_admin):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    password_hash = generate_password_hash(password)
+    try:
+        cursor.execute(
+            'INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)',
+            (username, password_hash, is_admin)
+        )
+        conn.commit()
+        user_id = cursor.lastrowid
+        return user_id
+    except sqlite3.IntegrityError:
+        return None
+    finally:
+        conn.close()

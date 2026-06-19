@@ -505,6 +505,25 @@ def admin_dashboard():
     return render_template('admin/dashboard.html', users=users, projects=projects, items=items)
 
 # Users CRUD
+@app.route('/admin/users/create', methods=['GET', 'POST'])
+@admin_required
+def admin_create_user():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        is_admin = int(request.form.get('is_admin', 0))
+        if not username or not password:
+            flash('El usuario y la contraseña son requeridos.', 'error')
+        else:
+            user_id = database.create_user_admin(username, password, is_admin)
+            if user_id is None:
+                flash('El nombre de usuario ya existe.', 'error')
+            else:
+                flash('Usuario creado con éxito.', 'success')
+                return redirect(url_for('admin_dashboard'))
+                
+    return render_template('admin/create_user.html')
+
 @app.route('/admin/users/<int:user_id>/edit', methods=['GET', 'POST'])
 @admin_required
 def admin_edit_user(user_id):
