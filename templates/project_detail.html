@@ -33,17 +33,23 @@
             </p>
         </div>
         
-        <div style="display: flex; gap: 10px;">
-            <button id="open-collabs-btn" class="brutalist-button" style="box-shadow: 2px 2px 0px var(--border-color); padding: 8px 16px; background: var(--accent-secondary); font-weight: 800;" data-i18n="manage_collabs_btn">
-                👥 Collaborators
+        <!-- Actions Dropdown -->
+        <div style="position: relative; display: inline-block;">
+            <button id="actions-dropdown-btn" class="brutalist-button" style="box-shadow: 2px 2px 0px var(--border-color); padding: 8px 16px; font-weight: 800; background: var(--accent-secondary);" data-i18n="actions_btn">
+                ⚙️ Actions
             </button>
-            {% if project.user_role == 'owner' or g.user.is_admin %}
-            <form method="post" action="/project/{{ project.id }}/delete" onsubmit="return confirm('Are you sure you want to delete this project? This will permanently delete all its audio tracks and alignment data.');" style="margin: 0;">
-                <button type="submit" class="brutalist-button danger-btn" style="box-shadow: 2px 2px 0px var(--border-color); padding: 8px 16px;" data-i18n="delete_project_btn">
-                    🗑️ Delete Project
+            <div id="actions-dropdown-menu" class="brutalist-card" style="display: none; position: absolute; right: 0; top: calc(100% + 8px); width: 180px; background: white; z-index: 1000; padding: 5px 0; border: 2.5px solid var(--border-color); box-shadow: 4px 4px 0px var(--border-color); flex-direction: column;">
+                <button id="open-collabs-btn" class="dropdown-item" style="width: 100%; text-align: left; background: none; border: none; padding: 10px 15px; font-weight: 800; font-size: 13px; font-family: inherit; cursor: pointer; color: var(--text-color); border-bottom: 2px solid var(--border-color);" data-i18n="manage_collabs_btn">
+                    👥 Collaborators
                 </button>
-            </form>
-            {% endif %}
+                {% if project.user_role == 'owner' or g.user.is_admin %}
+                <form method="post" action="/project/{{ project.id }}/delete" onsubmit="return confirm('Are you sure you want to delete this project? This will permanently delete all its audio tracks and alignment data.');" style="margin: 0; width: 100%;">
+                    <button type="submit" class="dropdown-item danger-item" style="width: 100%; text-align: left; background: none; border: none; padding: 10px 15px; font-weight: 800; font-size: 13px; font-family: inherit; cursor: pointer; color: var(--danger-color);" data-i18n="delete_project_btn">
+                        🗑️ Delete Project
+                    </button>
+                </form>
+                {% endif %}
+            </div>
         </div>
     </div>
 
@@ -197,6 +203,22 @@
 document.addEventListener('DOMContentLoaded', () => {
     const projectId = {{ project.id }};
     const openBtn = document.getElementById('open-collabs-btn');
+
+    // Toggle Actions Dropdown
+    const actionsBtn = document.getElementById('actions-dropdown-btn');
+    const actionsDropdown = document.getElementById('actions-dropdown-menu');
+    
+    if (actionsBtn && actionsDropdown) {
+        actionsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isDisplayed = actionsDropdown.style.display === 'flex';
+            actionsDropdown.style.display = isDisplayed ? 'none' : 'flex';
+        });
+        
+        document.addEventListener('click', () => {
+            actionsDropdown.style.display = 'none';
+        });
+    }
     const closeBtn = document.getElementById('close-collabs-modal');
     const modal = document.getElementById('collabs-modal');
     const collabsListContainer = document.getElementById('collabs-list-container');

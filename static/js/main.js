@@ -203,7 +203,96 @@ function renderRegions() {
             content: createRegionLabel(seg.end - seg.start)
         });
         seg.id = `seg-${i}`;
+        
+        if (!isViewer && currentState.stage === 1) {
+            region.element.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                showRegionContextMenu(e, region);
+            });
+        }
     });
+}
+
+function showRegionContextMenu(e, region) {
+    let menu = document.getElementById('region-context-menu');
+    if (menu) menu.remove();
+
+    menu = document.createElement('div');
+    menu.id = 'region-context-menu';
+    menu.className = 'brutalist-card';
+    menu.style.cssText = `
+        position: fixed;
+        left: ${e.clientX}px;
+        top: ${e.clientY}px;
+        background: white;
+        border: 2.5px solid var(--border-color);
+        box-shadow: 4px 4px 0px var(--border-color);
+        z-index: 9999;
+        padding: 5px 0;
+        min-width: 150px;
+    `;
+
+    const splitBtn = document.createElement('button');
+    splitBtn.className = 'dropdown-item';
+    splitBtn.style.cssText = `
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        padding: 8px 15px;
+        font-weight: 800;
+        font-family: inherit;
+        cursor: pointer;
+        font-size: 13px;
+        color: var(--text-color);
+    `;
+    splitBtn.innerText = window.currentLang === 'es' ? '✂️ Dividir segmento' : '✂️ Split Segment';
+    splitBtn.addEventListener('click', () => {
+        splitSegmentAtClick(e, region);
+        menu.remove();
+    });
+
+    menu.appendChild(splitBtn);
+    document.body.appendChild(menu);
+
+    const closeMenu = () => {
+        menu.remove();
+        document.removeEventListener('click', closeMenu);
+        document.removeEventListener('contextmenu', closeMenu);
+    };
+    setTimeout(() => {
+        document.addEventListener('click', closeMenu);
+        document.addEventListener('contextmenu', closeMenu);
+    }, 10);
+}
+
+function splitSegmentAtClick(e, region) {
+    if (!wsFull) return;
+    const rect = wsFull.getWrapper().getBoundingClientRect();
+    const x = e.clientX - rect.left + wsFull.getWrapper().scrollLeft;
+    const percentage = x / wsFull.getWrapper().scrollWidth;
+    const splitTime = percentage * wsFull.getDuration();
+
+    const idx = currentState.segments.findIndex(s => s.id === region.id);
+    if (idx === -1) return;
+    const targetSeg = currentState.segments[idx];
+    if (splitTime <= targetSeg.start || splitTime >= targetSeg.end) return;
+
+    const firstPart = {
+        ...targetSeg,
+        end: splitTime
+    };
+    const secondPart = {
+        start: splitTime,
+        end: targetSeg.end,
+        text: ''
+    };
+
+    currentState.segments[idx] = firstPart;
+    currentState.segments.splice(idx + 1, 0, secondPart);
+
+    renderRegions();
+    saveState();
 }
 
 function createRegionLabel(duration) {

@@ -121,7 +121,8 @@ window.translations = {
         add_collab_title: "Add Collaborator",
         add_btn_action: "Add",
         role_editor: "Editor",
-        role_viewer: "Viewer"
+        role_viewer: "Viewer",
+        actions_btn: "⚙️ Actions"
     },
     es: {
         title: "Audio Aligner",
@@ -243,7 +244,8 @@ window.translations = {
         add_collab_title: "Agregar Colaborador",
         add_btn_action: "Agregar",
         role_editor: "Editor",
-        role_viewer: "Solo lectura"
+        role_viewer: "Solo lectura",
+        actions_btn: "⚙️ Acciones"
     }
 };
 
