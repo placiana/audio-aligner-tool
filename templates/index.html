@@ -31,7 +31,7 @@
         
         <!-- Zoom controls -->
         <div class="zoom-container" style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px; background: #f3f4f6; padding: 10px; border: 2.5px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color); font-weight: 800; font-size: 13px;">
-            <label style="text-transform: uppercase;">🔍 Waveform Zoom:</label>
+            <label style="text-transform: uppercase;" data-i18n="waveform_zoom">🔍 Waveform Zoom:</label>
             <input type="range" id="zoom-slider-stage1" min="10" max="250" value="20" style="width: 250px; cursor: pointer;">
             <span id="zoom-value-stage1">20 px/s</span>
         </div>
@@ -46,12 +46,12 @@
                 </div>
                 
                 <div class="input-group" style="display: flex; flex-direction: column; gap: 5px;">
-                    <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;">Min Silence (ms):</label>
+                    <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="min_silence">Min Silence (ms):</label>
                     <input type="number" id="silence-ms-input" class="brutalist-input" value="500" min="100" max="5000" style="background: white;">
                 </div>
                 
                 <div class="input-group" style="display: flex; flex-direction: column; gap: 5px;">
-                    <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;">Silence Threshold (dB):</label>
+                    <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="silence_threshold">Silence Threshold (dB):</label>
                     <input type="number" id="silence-db-input" class="brutalist-input" value="-20" min="-100" max="0" style="background: white;">
                 </div>
             </div>
@@ -80,7 +80,7 @@
                 
                 <!-- Zoom controls -->
                 <div class="zoom-container" style="display: flex; align-items: center; gap: 12px; margin-bottom: 5px; font-weight: 800; font-size: 12px;">
-                    <label style="text-transform: uppercase;">🔍 Zoom:</label>
+                    <label style="text-transform: uppercase;" data-i18n="zoom">🔍 Zoom:</label>
                     <input type="range" id="zoom-slider-stage2" min="10" max="350" value="50" style="width: 150px; cursor: pointer;">
                 </div>
 
@@ -88,20 +88,20 @@
                 
                 <div id="segment-info" style="background: #fef9c3; padding: 12px; border: 2.5px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color); display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
                     <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 14px;">
-                        <span>SEGMENT #<span id="current-segment-idx">0</span> / <span id="total-segments">0</span></span>
+                        <span><span data-i18n="segment_prefix">SEGMENT</span> #<span id="current-segment-idx">0</span> / <span id="total-segments">0</span></span>
                         <span><span data-i18n="duration_label">Duration:</span> <span id="segment-duration">0.00</span>s</span>
                     </div>
                     
                     <!-- Re-segmentation fine-tuning buttons -->
                     <div style="display: flex; gap: 10px; justify-content: center; align-items: center; border-top: 2px solid var(--border-color); padding-top: 10px;">
-                        <span style="font-weight: 800; font-size: 11px; text-transform: uppercase;">Fine-tune:</span>
+                        <span style="font-weight: 800; font-size: 11px; text-transform: uppercase;" data-i18n="fine_tune">Fine-tune:</span>
                         <div style="display: flex; gap: 4px;">
-                            <button id="adj-start-minus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;">Start -0.1s</button>
-                            <button id="adj-start-plus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;">Start +0.1s</button>
+                            <button id="adj-start-minus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;" data-i18n="adj_start_minus">Start -0.1s</button>
+                            <button id="adj-start-plus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;" data-i18n="adj_start_plus">Start +0.1s</button>
                         </div>
                         <div style="display: flex; gap: 4px; margin-left: 10px;">
-                            <button id="adj-end-minus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;">End -0.1s</button>
-                            <button id="adj-end-plus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;">End +0.1s</button>
+                            <button id="adj-end-minus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;" data-i18n="adj_end_minus">End -0.1s</button>
+                            <button id="adj-end-plus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;" data-i18n="adj_end_plus">End +0.1s</button>
                         </div>
                     </div>
                 </div>
@@ -139,8 +139,8 @@
                 
                 <!-- Manual segment input (always visible, dynamically displays current segment text or permits direct typing) -->
                 <div id="manual-transcription-container" style="margin-top: 15px; background: #f3e8ff; padding: 15px; border: 2.5px solid var(--border-color); box-shadow: 3px 3px 0px var(--border-color); display: flex; flex-direction: column; gap: 8px;">
-                    <label style="font-weight: 900; font-size: 12px; text-transform: uppercase;">Active Segment Transcription text:</label>
-                    <textarea id="manual-transcription-input" class="brutalist-input" style="height: 100px; resize: none; font-family: inherit; font-size: 15px;" placeholder="Type transcription for this segment here..."></textarea>
+                    <label style="font-weight: 900; font-size: 12px; text-transform: uppercase;" data-i18n="active_segment_transcription_label">Active Segment Transcription text:</label>
+                    <textarea id="manual-transcription-input" class="brutalist-input" style="height: 100px; resize: none; font-family: inherit; font-size: 15px;" placeholder="Type transcription for this segment here..." data-i18n="active_segment_transcription_placeholder"></textarea>
                 </div>
 
                 <div class="alignment-actions" style="margin-top: 20px;">

@@ -17,7 +17,20 @@
                 {% for p in projects %}
                 <div class="project-item" style="border: 2.5px solid var(--border-color); box-shadow: 4px 4px 0px var(--border-color);">
                     <div class="project-info">
-                        <strong>{{ p.name }}</strong>
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 5px;">
+                            <strong style="display: inline-block; margin-bottom: 0;">{{ p.name }}</strong>
+                            <span class="block-badge" data-i18n="type_{{ p.type }}" style="font-size: 11px; padding: 2px 8px; border: var(--border-width) solid var(--border-color); font-weight: 900; text-transform: uppercase; display: inline-block;
+                                {% if p.type == 'alignment' %}
+                                    background: var(--accent-secondary);
+                                {% elif p.type == 'transcription' %}
+                                    background: var(--accent-tertiary);
+                                {% else %}
+                                    background: var(--accent-color);
+                                {% endif %}
+                            ">
+                                {{ p.type }}
+                            </span>
+                        </div>
                         <p style="margin: 5px 0 0 0; color: #666; font-size: 14px; font-weight: 600;">
                             {{ p.description or 'No description provided.' }}
                         </p>

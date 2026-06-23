@@ -5,9 +5,22 @@
 {% block content %}
 <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid var(--border-color); padding-bottom: 15px;">
     <div>
-        <h2 style="margin: 0; font-size: 24px; font-weight: 900; text-transform: uppercase;">
-            📁 {{ project.name }}
-        </h2>
+        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <h2 style="margin: 0; font-size: 24px; font-weight: 900; text-transform: uppercase;">
+                📁 {{ project.name }}
+            </h2>
+            <span class="block-badge" data-i18n="type_{{ project.type }}" style="font-size: 13px; padding: 4px 10px; border: var(--border-width) solid var(--border-color); font-weight: 900; text-transform: uppercase;
+                {% if project.type == 'alignment' %}
+                    background: var(--accent-secondary);
+                {% elif project.type == 'transcription' %}
+                    background: var(--accent-tertiary);
+                {% else %}
+                    background: var(--accent-color);
+                {% endif %}
+            ">
+                {{ project.type }}
+            </span>
+        </div>
         <p style="margin: 5px 0 0 0; color: #555; font-weight: 700; font-size: 14px;">
             {{ project.description or 'No description provided.' }}
         </p>

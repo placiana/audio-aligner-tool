@@ -101,7 +101,19 @@ window.translations = {
         select_and_assign_btn: "Select text above and assign",
         segments_created: "segments created",
         segments_transcribed: "segments transcribed",
-        segments_aligned: "segments aligned"
+        segments_aligned: "segments aligned",
+        waveform_zoom: "🔍 Waveform Zoom:",
+        min_silence: "Min Silence (ms):",
+        silence_threshold: "Silence Threshold (dB):",
+        zoom: "🔍 Zoom:",
+        segment_prefix: "SEGMENT",
+        fine_tune: "Fine-tune:",
+        adj_start_minus: "Start -0.1s",
+        adj_start_plus: "Start +0.1s",
+        adj_end_minus: "End -0.1s",
+        adj_end_plus: "End +0.1s",
+        active_segment_transcription_label: "Active Segment Transcription text:",
+        active_segment_transcription_placeholder: "Type transcription for this segment here..."
     },
     es: {
         title: "Audio Aligner",
@@ -203,7 +215,19 @@ window.translations = {
         select_and_assign_btn: "Selecciona texto arriba y asigna",
         segments_created: "segmentos creados",
         segments_transcribed: "segmentos transcritos",
-        segments_aligned: "segmentos alineados"
+        segments_aligned: "segmentos alineados",
+        waveform_zoom: "🔍 Zoom del audio:",
+        min_silence: "Silencio mín. (ms):",
+        silence_threshold: "Umbral de silencio (dB):",
+        zoom: "🔍 Zoom:",
+        segment_prefix: "SEGMENTO",
+        fine_tune: "Ajuste fino:",
+        adj_start_minus: "Inicio -0.1s",
+        adj_start_plus: "Inicio +0.1s",
+        adj_end_minus: "Fin -0.1s",
+        adj_end_plus: "Fin +0.1s",
+        active_segment_transcription_label: "Texto de transcripción del segmento activo:",
+        active_segment_transcription_placeholder: "Escribe aquí la transcripción de este segmento..."
     }
 };
 
@@ -216,7 +240,11 @@ window.updateLanguageUI = function() {
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         if (window.translations[window.currentLang] && window.translations[window.currentLang][key]) {
-            el.innerText = window.translations[window.currentLang][key];
+            if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                el.placeholder = window.translations[window.currentLang][key];
+            } else {
+                el.innerText = window.translations[window.currentLang][key];
+            }
         }
     });
 
