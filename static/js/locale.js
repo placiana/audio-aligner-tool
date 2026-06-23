@@ -11,9 +11,9 @@ window.translations = {
         create_project_btn: "➕ Create Project",
         delete_project_btn: "🗑️ Delete Project",
         project_type_label: "Project Type",
-        type_segmentation: "Segmentation Only (Audio)",
-        type_transcription: "Segmentation & Transcription (Audio)",
-        type_alignment: "Segmentation & Alignment (Audio + Text)",
+        type_segmentation: "Segmentation Only",
+        type_transcription: "Segmentation & Transcription",
+        type_alignment: "Segmentation & Alignment",
         save_segment_btn: "Save Segment",
         next_seg_only_btn: "Next Segment",
         completion_seg_only_congrats: "Excellent work! You have completed the segmentation of this audio.",
@@ -34,7 +34,9 @@ window.translations = {
         json_btn: "JSON",
         elan_btn: "ELAN",
         logout_btn: "Logout",
+        admin_nav: "⚙️ Admin Panel",
         projects_nav: "📂 Projects",
+        back_to_projects: "⬅ Back to Projects",
         login_title: "Sign In",
         username_label: "Username",
         password_label: "Password",
@@ -45,7 +47,7 @@ window.translations = {
         register_btn: "Sign Up",
         already_user_prompt: "Already have an account?",
         sign_in_link: "Sign In",
-        
+
         // Editor
         welcome_title: "Select an audio to process",
         download_db: "📥 Download Consolidated Database (JSON)",
@@ -148,7 +150,9 @@ window.translations = {
         json_btn: "JSON",
         elan_btn: "ELAN",
         logout_btn: "Cerrar sesión",
+        admin_nav: "⚙️ Panel de Admin",
         projects_nav: "📂 Proyectos",
+        back_to_projects: "⬅ Volver a Proyectos",
         login_title: "Iniciar Sesión",
         username_label: "Usuario",
         password_label: "Contraseña",
@@ -159,7 +163,7 @@ window.translations = {
         register_btn: "Registrarse",
         already_user_prompt: "¿Ya tienes una cuenta?",
         sign_in_link: "Iniciar Sesión",
-        
+
         // Editor
         welcome_title: "Selecciona un audio para procesar",
         download_db: "📥 Descargar Base de Datos Consolidada (JSON)",
@@ -231,7 +235,7 @@ window.translations = {
     }
 };
 
-window.updateLanguageUI = function() {
+window.updateLanguageUI = function () {
     const langBtn = document.getElementById('lang-toggle-btn');
     if (langBtn) {
         langBtn.innerText = window.currentLang === 'en' ? '🌐 ES' : '🌐 EN';
@@ -268,11 +272,11 @@ window.updateLanguageUI = function() {
     });
 };
 
-window.toggleLanguage = function() {
+window.toggleLanguage = function () {
     window.currentLang = window.currentLang === 'en' ? 'es' : 'en';
     localStorage.setItem('aligner_lang', window.currentLang);
     window.updateLanguageUI();
-    
+
     // Dispatch a custom event to notify main.js if it is running on this page
     window.dispatchEvent(new Event('languagechanged'));
 };
