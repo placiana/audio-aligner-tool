@@ -235,6 +235,9 @@ def upload_track(project_id):
     if not project:
         flash('Project not found.', 'error')
         return redirect(url_for('dashboard'))
+    if project.get('user_role') == 'viewer':
+        flash('Acceso denegado: El rol de solo lectura no permite subir pistas.', 'error')
+        return redirect(url_for('project_detail', project_id=project_id))
     
     audio_file = request.files.get('audio_file')
     text_file = request.files.get('text_file')
@@ -307,7 +310,8 @@ def align(item_id):
     return render_template('index.html',
                            state=state,
                            selected_config=selected_config,
-                           project_id=project['id'])
+                           project_id=project['id'],
+                           user_role=project.get('user_role', 'viewer'))
 
 # --- Serving Uploaded Files ---
 
@@ -410,6 +414,8 @@ def save_state_api():
     project = database.get_project(item['project_id'], g.user['id'])
     if not project:
         return jsonify({"error": "Unauthorized"}), 403
+    if project.get('user_role') == 'viewer':
+        return jsonify({"error": "Unauthorized: Read-only access"}), 403
         
     database.update_audio_item_state(item_id, json.dumps(data))
     return jsonify({"status": "success"})
@@ -493,6 +499,95 @@ def export_json(item_id):
         as_attachment=True, 
         download_name=download_name
     )
+
+# --- Collaborators APIs ---
+
+@app.route('/api/users/autocomplete')
+@login_required
+def users_autocomplete():
+    query = request.args.get('q', '')
+    if len(query) < 2:
+        return jsonify([])
+    users = database.search_users_for_autocomplete(query, g.user['id'])
+    return jsonify(users)
+
+@app.route('/api/project/<int:project_id>/collaborators')
+@login_required
+def list_project_collaborators(project_id):
+    project = database.get_project(project_id, g.user['id'])
+    if not project:
+        return jsonify({"error": "Project not found or access denied"}), 403
+    collabs = database.list_collaborators(project_id)
+    return jsonify({
+        "collaborators": collabs,
+        "current_user_role": project['user_role']
+    })
+
+@app.route('/api/project/<int:project_id>/collaborators', methods=['POST'])
+@login_required
+def add_project_collaborator(project_id):
+    project = database.get_project(project_id, g.user['id'])
+    if not project:
+        return jsonify({"error": "Project not found or access denied"}), 403
+        
+    if project['user_role'] != 'owner':
+        return jsonify({"error": "Only the project owner can manage collaborators"}), 403
+        
+    data = request.json
+    username = data.get('username')
+    role = data.get('role', 'editor')
+    
+    if not username:
+        return jsonify({"error": "Username is required"}), 400
+    if role not in ['editor', 'viewer']:
+        return jsonify({"error": "Invalid role"}), 400
+        
+    res = database.add_collaborator(project_id, username, role)
+    if res['success']:
+        return jsonify({"status": "success"})
+    else:
+        err = res['error']
+        if err == 'user_not_found':
+            return jsonify({"error": "User not found"}), 404
+        elif err == 'is_owner':
+            return jsonify({"error": "User is the owner of this project"}), 400
+        elif err == 'already_collaborator':
+            return jsonify({"error": "User is already a collaborator"}), 400
+        return jsonify({"error": "Failed to add collaborator"}), 500
+
+@app.route('/api/project/<int:project_id>/collaborators/<int:collab_user_id>', methods=['PUT'])
+@login_required
+def update_project_collaborator_role(project_id, collab_user_id):
+    project = database.get_project(project_id, g.user['id'])
+    if not project:
+        return jsonify({"error": "Project not found or access denied"}), 403
+        
+    if project['user_role'] != 'owner':
+        return jsonify({"error": "Only the project owner can manage collaborators"}), 403
+        
+    data = request.json
+    role = data.get('role')
+    if role not in ['editor', 'viewer']:
+        return jsonify({"error": "Invalid role"}), 400
+        
+    if database.update_collaborator_role(project_id, collab_user_id, role):
+        return jsonify({"status": "success"})
+    return jsonify({"error": "Collaborator not found or not updated"}), 404
+
+@app.route('/api/project/<int:project_id>/collaborators/<int:collab_user_id>', methods=['DELETE'])
+@login_required
+def delete_project_collaborator(project_id, collab_user_id):
+    project = database.get_project(project_id, g.user['id'])
+    if not project:
+        return jsonify({"error": "Project not found or access denied"}), 403
+        
+    if project['user_role'] != 'owner':
+        return jsonify({"error": "Only the project owner can manage collaborators"}), 403
+        
+    if database.delete_collaborator(project_id, collab_user_id):
+        return jsonify({"status": "success"})
+    return jsonify({"error": "Collaborator not found"}), 404
+
 
 # --- Admin CRUD Routes ---
 

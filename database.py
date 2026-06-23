@@ -43,6 +43,20 @@ def init_db():
         );
     ''')
     
+    # Collaborators Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS project_collaborators (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            role TEXT NOT NULL DEFAULT 'editor',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(project_id, user_id),
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+    ''')
+    
     # AudioItems Table (Audio/Text Alignment entities)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS audio_items (
@@ -132,7 +146,17 @@ def create_project(name, description, project_type, user_id):
 def list_projects(user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC', (user_id,))
+    cursor.execute('''
+        SELECT p.*, 'owner' as user_role 
+        FROM projects p 
+        WHERE p.user_id = ?
+        UNION
+        SELECT p.*, pc.role as user_role 
+        FROM projects p 
+        JOIN project_collaborators pc ON p.id = pc.project_id 
+        WHERE pc.user_id = ?
+        ORDER BY created_at DESC
+    ''', (user_id, user_id))
     projects = cursor.fetchall()
     conn.close()
     return [dict(p) for p in projects]
@@ -140,11 +164,25 @@ def list_projects(user_id):
 def get_project(project_id, user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM projects WHERE id = ? AND user_id = ?', (project_id, user_id))
-    project = cursor.fetchone()
+    cursor.execute('SELECT * FROM projects WHERE id = ?', (project_id,))
+    project_row = cursor.fetchone()
+    if not project_row:
+        conn.close()
+        return None
+        
+    project = dict(project_row)
+    if project['user_id'] == user_id:
+        project['user_role'] = 'owner'
+        conn.close()
+        return project
+        
+    cursor.execute('SELECT role FROM project_collaborators WHERE project_id = ? AND user_id = ?', (project_id, user_id))
+    collab = cursor.fetchone()
     conn.close()
-    if project:
-        return dict(project)
+    if collab:
+        project['user_role'] = collab['role']
+        return project
+        
     return None
 
 def delete_project(project_id, user_id):
@@ -311,3 +349,94 @@ def create_user_admin(username, password, is_admin):
         return None
     finally:
         conn.close()
+
+# --- Collaborators Functions ---
+
+def list_collaborators(project_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT u.id as user_id, u.username, 'owner' as role 
+        FROM projects p 
+        JOIN users u ON p.user_id = u.id 
+        WHERE p.id = ?
+    ''', (project_id,))
+    owner = cursor.fetchone()
+    
+    cursor.execute('''
+        SELECT u.id as user_id, u.username, pc.role 
+        FROM project_collaborators pc 
+        JOIN users u ON pc.user_id = u.id 
+        WHERE pc.project_id = ?
+    ''', (project_id,))
+    collabs = cursor.fetchall()
+    conn.close()
+    
+    result = []
+    if owner:
+        result.append(dict(owner))
+    result.extend([dict(c) for c in collabs])
+    return result
+
+def add_collaborator(project_id, username, role):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id FROM users WHERE username = ?', (username,))
+    user = cursor.fetchone()
+    if not user:
+        conn.close()
+        return {'success': False, 'error': 'user_not_found'}
+        
+    user_id = user['id']
+    cursor.execute('SELECT user_id FROM projects WHERE id = ?', (project_id,))
+    proj = cursor.fetchone()
+    if proj and proj['user_id'] == user_id:
+        conn.close()
+        return {'success': False, 'error': 'is_owner'}
+        
+    try:
+        cursor.execute(
+            'INSERT INTO project_collaborators (project_id, user_id, role) VALUES (?, ?, ?)',
+            (project_id, user_id, role)
+        )
+        conn.commit()
+        conn.close()
+        return {'success': True}
+    except sqlite3.IntegrityError:
+        conn.close()
+        return {'success': False, 'error': 'already_collaborator'}
+
+def update_collaborator_role(project_id, user_id, role):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        'UPDATE project_collaborators SET role = ? WHERE project_id = ? AND user_id = ?',
+        (role, project_id, user_id)
+    )
+    conn.commit()
+    rows = cursor.rowcount
+    conn.close()
+    return rows > 0
+
+def delete_collaborator(project_id, user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        'DELETE FROM project_collaborators WHERE project_id = ? AND user_id = ?',
+        (project_id, user_id)
+    )
+    conn.commit()
+    rows = cursor.rowcount
+    conn.close()
+    return rows > 0
+
+def search_users_for_autocomplete(query, exclude_user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT username FROM users WHERE username LIKE ? AND id != ? LIMIT 10',
+        ('%' + query + '%', exclude_user_id)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [row['username'] for row in rows]

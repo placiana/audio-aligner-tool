@@ -115,7 +115,13 @@ window.translations = {
         adj_end_minus: "End -0.1s",
         adj_end_plus: "End +0.1s",
         active_segment_transcription_label: "Active Segment Transcription text:",
-        active_segment_transcription_placeholder: "Type transcription for this segment here..."
+        active_segment_transcription_placeholder: "Type transcription for this segment here...",
+        manage_collabs_btn: "👥 Collaborators",
+        collabs_modal_title: "👥 Project Collaborators",
+        add_collab_title: "Add Collaborator",
+        add_btn_action: "Add",
+        role_editor: "Editor",
+        role_viewer: "Viewer"
     },
     es: {
         title: "Audio Aligner",
@@ -231,7 +237,13 @@ window.translations = {
         adj_end_minus: "Fin -0.1s",
         adj_end_plus: "Fin +0.1s",
         active_segment_transcription_label: "Texto de transcripción del segmento activo:",
-        active_segment_transcription_placeholder: "Escribe aquí la transcripción de este segmento..."
+        active_segment_transcription_placeholder: "Escribe aquí la transcripción de este segmento...",
+        manage_collabs_btn: "👥 Colaboradores",
+        collabs_modal_title: "👥 Colaboradores del Proyecto",
+        add_collab_title: "Agregar Colaborador",
+        add_btn_action: "Agregar",
+        role_editor: "Editor",
+        role_viewer: "Solo lectura"
     }
 };
 

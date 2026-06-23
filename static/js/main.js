@@ -20,6 +20,24 @@ document.addEventListener('DOMContentLoaded', () => {
     initStage();
     setupEventListeners();
     
+    if (window.userRole === 'viewer') {
+        const textarea = document.getElementById('manual-transcription-input');
+        if (textarea) textarea.readOnly = true;
+        
+        const hideIds = ['reset-seg-btn', 'save-btn', 'detect-btn', 'confirm-segments-btn', 'assign-btn', 
+                         'adj-start-minus', 'adj-start-plus', 'adj-end-minus', 'adj-end-plus'];
+        hideIds.forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.style.display = 'none';
+        });
+        
+        const silenceInputs = ['target-duration-input', 'silence-ms-input', 'silence-db-input'];
+        silenceInputs.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = true;
+        });
+    }
+    
     // Selection listener to sync text highlighting into input textarea
     document.addEventListener('selectionchange', () => {
         if (currentState.stage === 2 && config && config.text_path && config.project_type === 'alignment') {
@@ -173,14 +191,15 @@ function initWaveformFull() {
 function renderRegions() {
     if (!config) return;
     regions.clearRegions();
+    const isViewer = (window.userRole === 'viewer');
     currentState.segments.forEach((seg, i) => {
         const region = regions.addRegion({
             id: `seg-${i}`,
             start: seg.start,
             end: seg.end,
             color: 'rgba(0, 123, 255, 0.2)',
-            drag: true,
-            resize: true,
+            drag: !isViewer,
+            resize: !isViewer,
             content: createRegionLabel(seg.end - seg.start)
         });
         seg.id = `seg-${i}`;

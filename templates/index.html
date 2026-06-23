@@ -226,6 +226,7 @@
 <script>
     const initialState = {{ state | tojson | safe if state else 'null' }};
     const config = {{ selected_config | tojson | safe if selected_config else 'null' }};
+    window.userRole = "{{ user_role }}";
 </script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% endblock %}
