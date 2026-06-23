@@ -7,19 +7,22 @@
 <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
 {% endblock %}
 
-{% block header_middle %}
-<div id="progress-container">
-    <div id="progress-bar"></div>
-    <span id="progress-text">0%</span>
-</div>
-{% endblock %}
-
-{% block header_actions %}
-<button id="reset-seg-btn" class="brutalist-button danger-btn" style="display: none;" data-i18n="reset_btn">Reset</button>
-<button id="save-btn" class="brutalist-button" data-i18n="save_btn">Save</button>
-{% endblock %}
-
 {% block content %}
+<!-- Editor Control Bar -->
+<div class="editor-control-bar brutalist-card" style="background: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 20px;">
+    <a href="/project/{{ project_id }}" class="brutalist-button secondary-btn button-link" style="padding: 8px 16px; box-shadow: 2px 2px 0px var(--border-color);" data-i18n="back_to_list">⬅ Back to List</a>
+    
+    <div id="progress-container" style="margin: 0; flex-grow: 1; max-width: 500px;">
+        <div id="progress-bar"></div>
+        <span id="progress-text">0%</span>
+    </div>
+    
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <button id="reset-seg-btn" class="brutalist-button danger-btn" style="display: none; padding: 8px 16px; box-shadow: 2px 2px 0px var(--border-color);" data-i18n="reset_btn">Reset</button>
+        <button id="save-btn" class="brutalist-button" style="padding: 8px 16px; box-shadow: 2px 2px 0px var(--border-color);" data-i18n="save_btn">Save</button>
+    </div>
+</div>
+
 <div id="editor-container" style="margin-top: 10px;">
     <!-- Stage 1: Segmentation -->
     <div id="stage1" class="stage brutalist-card" style="background: white;">
