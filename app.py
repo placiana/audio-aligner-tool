@@ -1,12 +1,16 @@
 import os
 import json
+import shutil
+import csv
 from flask import Flask, render_template, request, jsonify, send_from_directory, send_file, session, g, redirect, url_for, flash
-from io import BytesIO
+from io import BytesIO, StringIO
 from pydub import AudioSegment, silence
 from werkzeug.utils import secure_filename
 import functools
 import database
 import elan_exporter
+import repository
+
 
 app = Flask(__name__)
 app.secret_key = 'aligner-secret-session-key' # Change to a secure random string in production
@@ -166,7 +170,97 @@ def index():
 @login_required
 def dashboard():
     projects = database.list_projects(g.user['id'])
-    return render_template('dashboard.html', projects=projects)
+    repo_summary = repository.get_repo_summary(app.config['UPLOAD_FOLDER'], g.user['id'])
+    return render_template('dashboard.html', projects=projects, repo_summary=repo_summary)
+
+# --- User Repository Views & APIs ---
+
+@app.route('/repository')
+@login_required
+def repository_view():
+    path = request.args.get('path', '')
+    return render_template('repository.html', initial_path=path)
+
+@app.route('/api/repository/list')
+@login_required
+def api_repository_list():
+    path = request.args.get('path', '')
+    try:
+        data = repository.list_repo_dir(app.config['UPLOAD_FOLDER'], g.user['id'], path)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/repository/folder', methods=['POST'])
+@login_required
+def api_repository_create_folder():
+    data = request.json or {}
+    path = data.get('path', '')
+    folder_name = data.get('name', '')
+    try:
+        new_rel = repository.create_repo_folder(app.config['UPLOAD_FOLDER'], g.user['id'], path, folder_name)
+        return jsonify({'status': 'success', 'path': new_rel})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/repository/upload', methods=['POST'])
+@login_required
+def api_repository_upload():
+    path = request.form.get('path', '')
+    files = request.files.getlist('files')
+    if not files:
+        single_file = request.files.get('file')
+        if single_file:
+            files = [single_file]
+            
+    if not files:
+        return jsonify({'error': 'No files provided.'}), 400
+        
+    try:
+        saved = repository.upload_repo_files(app.config['UPLOAD_FOLDER'], g.user['id'], path, files)
+        return jsonify({'status': 'success', 'saved': saved})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/repository/delete', methods=['POST'])
+@login_required
+def api_repository_delete():
+    data = request.json or {}
+    path = data.get('path', '')
+    try:
+        repository.delete_repo_item(app.config['UPLOAD_FOLDER'], g.user['id'], path)
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/repository/rename', methods=['POST'])
+@login_required
+def api_repository_rename():
+    data = request.json or {}
+    path = data.get('path', '')
+    new_name = data.get('new_name', '')
+    try:
+        repository.rename_repo_item(app.config['UPLOAD_FOLDER'], g.user['id'], path, new_name)
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/repository/download')
+@login_required
+def repository_download():
+    path = request.args.get('path', '')
+    is_download = request.args.get('download', '1') == '1'
+    try:
+        target_path, clean_rel = repository.safe_join_user_repo(app.config['UPLOAD_FOLDER'], g.user['id'], path)
+        if not os.path.exists(target_path) or os.path.isdir(target_path):
+            flash('Archivo no encontrado.', 'error')
+            return redirect(url_for('repository_view'))
+        filename = os.path.basename(target_path)
+        return send_file(target_path, as_attachment=is_download, download_name=filename)
+    except Exception as e:
+        flash(f'Error al acceder al archivo: {str(e)}', 'error')
+        return redirect(url_for('repository_view'))
+
 
 @app.route('/project/create', methods=['POST'])
 @login_required
@@ -241,8 +335,11 @@ def upload_track(project_id):
     
     audio_file = request.files.get('audio_file')
     text_file = request.files.get('text_file')
+    repo_audio_path = request.form.get('repo_audio_path', '').strip()
+    repo_text_path = request.form.get('repo_text_path', '').strip()
     
-    if not audio_file or audio_file.filename == '':
+    has_audio_file = audio_file and audio_file.filename != ''
+    if not has_audio_file and not repo_audio_path:
         flash('Audio file is required.', 'error')
         return redirect(url_for('project_detail', project_id=project_id))
         
@@ -253,15 +350,39 @@ def upload_track(project_id):
     os.makedirs(audio_dir, exist_ok=True)
     os.makedirs(texts_dir, exist_ok=True)
     
-    # Save audio file
-    audio_filename = secure_filename(audio_file.filename)
-    audio_local_path = os.path.join(audio_dir, audio_filename)
-    audio_file.save(audio_local_path)
-    audio_db_path = f"projects/{project_id}/audio/{audio_filename}"
-    
-    # Save text file (optional)
+    # 1. Save / Copy Audio File
+    if repo_audio_path:
+        try:
+            source_audio_path, _ = repository.safe_join_user_repo(app.config['UPLOAD_FOLDER'], g.user['id'], repo_audio_path)
+            if not os.path.exists(source_audio_path) or os.path.isdir(source_audio_path):
+                flash('El archivo de audio seleccionado del repositorio no existe.', 'error')
+                return redirect(url_for('project_detail', project_id=project_id))
+            audio_filename = secure_filename(os.path.basename(source_audio_path))
+            audio_local_path = os.path.join(audio_dir, audio_filename)
+            shutil.copy(source_audio_path, audio_local_path)
+            audio_db_path = f"projects/{project_id}/audio/{audio_filename}"
+        except Exception as e:
+            flash(f'Error al copiar el audio del repositorio: {str(e)}', 'error')
+            return redirect(url_for('project_detail', project_id=project_id))
+    else:
+        audio_filename = secure_filename(audio_file.filename)
+        audio_local_path = os.path.join(audio_dir, audio_filename)
+        audio_file.save(audio_local_path)
+        audio_db_path = f"projects/{project_id}/audio/{audio_filename}"
+        
+    # 2. Save / Copy Text File (optional)
     text_db_path = ""
-    if text_file and text_file.filename != '':
+    if repo_text_path:
+        try:
+            source_text_path, _ = repository.safe_join_user_repo(app.config['UPLOAD_FOLDER'], g.user['id'], repo_text_path)
+            if os.path.exists(source_text_path) and not os.path.isdir(source_text_path):
+                text_filename = secure_filename(os.path.basename(source_text_path))
+                text_local_path = os.path.join(texts_dir, text_filename)
+                shutil.copy(source_text_path, text_local_path)
+                text_db_path = f"projects/{project_id}/texts/{text_filename}"
+        except Exception as e:
+            print(f"Error copying text file from repository: {e}")
+    elif text_file and text_file.filename != '':
         text_filename = secure_filename(text_file.filename)
         text_local_path = os.path.join(texts_dir, text_filename)
         text_file.save(text_local_path)
@@ -277,7 +398,7 @@ def upload_track(project_id):
     }
     
     database.create_audio_item(project_id, audio_db_path, text_db_path, json.dumps(default_state))
-    flash('Track uploaded successfully!', 'success')
+    flash('Track added successfully!', 'success')
     return redirect(url_for('project_detail', project_id=project_id))
 
 # --- Editor View ---
@@ -496,6 +617,58 @@ def export_json(item_id):
     return send_file(
         buffer, 
         mimetype="application/json", 
+        as_attachment=True, 
+        download_name=download_name
+    )
+
+@app.route('/api/export_csv/<int:item_id>')
+@login_required
+def export_csv(item_id):
+    item = database.get_audio_item(item_id)
+    if not item:
+        flash('Track not found.', 'error')
+        return redirect(url_for('dashboard'))
+        
+    project = database.get_project(item['project_id'], g.user['id'])
+    if not project:
+        flash('Unauthorized.', 'error')
+        return redirect(url_for('dashboard'))
+        
+    try:
+        state = json.loads(item['state_json'])
+        segments = state.get('segments', [])
+    except:
+        segments = []
+        
+    audio_filename = item['audio_path'].split('/')[-1]
+    
+    has_text = project['type'] != 'segmentation'
+    fieldnames = ["id", "start", "end"]
+    if has_text:
+        fieldnames.append("text")
+        
+    output = StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator='\n')
+    writer.writeheader()
+    
+    for i, seg in enumerate(segments):
+        row = {
+            "id": seg.get("id", f"seg-{i}"),
+            "start": round(seg.get("start", 0.0), 3),
+            "end": round(seg.get("end", 0.0), 3)
+        }
+        if has_text:
+            row["text"] = seg.get("text", "")
+        writer.writerow(row)
+        
+    buffer = BytesIO()
+    buffer.write(output.getvalue().encode('utf-8-sig'))
+    buffer.seek(0)
+    
+    download_name = os.path.splitext(audio_filename)[0] + '.csv'
+    return send_file(
+        buffer, 
+        mimetype="text/csv", 
         as_attachment=True, 
         download_name=download_name
     )

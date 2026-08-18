@@ -1,0 +1,501 @@
+{% extends 'base.html' %}
+
+{% block title %}Repository - Audio Aligner{% endblock %}
+
+{% block content %}
+<div class="repository-container" style="margin-top: 10px;">
+    
+    <!-- Top Bar / Breadcrumb Header -->
+    <div class="brutalist-card" style="background: white; padding: 20px 25px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+            <div>
+                <a href="/dashboard" class="brutalist-button button-link" style="padding: 6px 12px; font-size: 12px; margin-bottom: 10px; display: inline-block;" data-i18n="back_to_projects">
+                    ⬅ Back to Projects
+                </a>
+                <h2 style="margin: 5px 0 0 0; font-weight: 900; font-size: 24px; text-transform: uppercase; display: flex; align-items: center; gap: 10px;" data-i18n="repo_title">
+                    📁 Your Repository
+                </h2>
+            </div>
+            
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button id="btn-new-folder" class="brutalist-button" style="background: var(--accent-secondary);" data-i18n="new_folder">
+                    📁 New Folder
+                </button>
+                <button id="btn-upload-file" class="brutalist-button" style="background: var(--accent-color);" data-i18n="upload_files">
+                    📤 Upload Files
+                </button>
+                <input type="file" id="hidden-file-input" multiple style="display: none;">
+            </div>
+        </div>
+
+        <!-- Breadcrumbs Navigation -->
+        <div id="repo-breadcrumbs" style="margin-top: 15px; padding-top: 15px; border-top: 2px solid var(--border-color); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 800; font-size: 14px;">
+            <!-- Rendered dynamically -->
+        </div>
+    </div>
+
+    <!-- Drag and Drop Dropzone -->
+    <div id="drag-drop-zone" class="brutalist-card" style="background: #fdf4ff; border: 2.5px dashed var(--border-color); box-shadow: none; text-align: center; padding: 25px; cursor: pointer; display: none; transition: all 0.2s ease;">
+        <div style="font-size: 28px; margin-bottom: 5px;">📥</div>
+        <strong style="font-size: 16px; text-transform: uppercase;" data-i18n="drop_files_here">Drop files here to upload to current directory</strong>
+    </div>
+
+    <!-- Repository File List -->
+    <div class="brutalist-card" style="background: white; padding: 0; overflow: hidden;">
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead>
+                    <tr style="background: var(--accent-tertiary); border-bottom: 2.5px solid var(--border-color);">
+                        <th style="padding: 15px 20px; font-weight: 900; text-transform: uppercase; font-size: 13px;" data-i18n="th_name">Name</th>
+                        <th style="padding: 15px 15px; font-weight: 900; text-transform: uppercase; font-size: 13px; width: 120px;" data-i18n="th_size">Size</th>
+                        <th style="padding: 15px 15px; font-weight: 900; text-transform: uppercase; font-size: 13px; width: 180px;" data-i18n="th_modified">Modified</th>
+                        <th style="padding: 15px 20px; font-weight: 900; text-transform: uppercase; font-size: 13px; text-align: right; width: 220px;" data-i18n="th_actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="repo-table-body">
+                    <!-- Populated dynamically via JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <div id="repo-empty-state" style="display: none; text-align: center; padding: 50px 20px;">
+            <div style="font-size: 40px; margin-bottom: 10px;">📭</div>
+            <h3 style="margin: 0; font-weight: 900; text-transform: uppercase;" data-i18n="empty_repo">This folder is empty</h3>
+            <p style="color: #666; font-weight: 600; margin-top: 5px;" data-i18n="empty_repo_sub">Upload files or create folders using the buttons above.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: New Folder -->
+<div id="modal-new-folder" class="brutalist-modal" style="display: none;">
+    <div class="brutalist-modal-content" style="max-width: 450px; height: auto;">
+        <div class="modal-header">
+            <h2 data-i18n="new_folder">📁 New Folder</h2>
+            <button class="brutalist-button modal-close-x" onclick="closeFolderModal()">✕</button>
+        </div>
+        <form id="form-create-folder" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label for="folder-name-input" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="folder_name_label">Folder Name</label>
+                <input type="text" id="folder-name-input" class="brutalist-input" required placeholder="e.g. Audios_2026">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                <button type="button" class="brutalist-button button-link" onclick="closeFolderModal()" data-i18n="cancel_btn">Cancel</button>
+                <button type="submit" class="brutalist-button" style="background: var(--accent-secondary);" data-i18n="create_btn">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Rename Item -->
+<div id="modal-rename-item" class="brutalist-modal" style="display: none;">
+    <div class="brutalist-modal-content" style="max-width: 450px; height: auto;">
+        <div class="modal-header">
+            <h2 data-i18n="rename_item">✏️ Rename Item</h2>
+            <button class="brutalist-button modal-close-x" onclick="closeRenameModal()">✕</button>
+        </div>
+        <form id="form-rename-item" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+            <input type="hidden" id="rename-target-path">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label for="rename-name-input" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="new_name_label">New Name</label>
+                <input type="text" id="rename-name-input" class="brutalist-input" required>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                <button type="button" class="brutalist-button button-link" onclick="closeRenameModal()" data-i18n="cancel_btn">Cancel</button>
+                <button type="submit" class="brutalist-button" style="background: var(--accent-color);" data-i18n="save_btn">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: File Preview -->
+<div id="modal-file-preview" class="brutalist-modal" style="display: none;">
+    <div class="brutalist-modal-content" style="max-width: 750px; height: 80vh;">
+        <div class="modal-header">
+            <h2 id="preview-filename">📄 Preview</h2>
+            <button class="brutalist-button modal-close-x" onclick="closePreviewModal()">✕</button>
+        </div>
+        <div class="modal-body" id="preview-body" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <!-- Loaded content (Audio player / Text content / Image view) -->
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentPath = "{{ initial_path }}";
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadRepoContents(currentPath);
+
+        // Buttons
+        document.getElementById('btn-new-folder').addEventListener('click', () => {
+            document.getElementById('folder-name-input').value = '';
+            document.getElementById('modal-new-folder').style.display = 'flex';
+            document.getElementById('folder-name-input').focus();
+        });
+
+        document.getElementById('btn-upload-file').addEventListener('click', () => {
+            document.getElementById('hidden-file-input').click();
+        });
+
+        document.getElementById('hidden-file-input').addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                uploadFiles(e.target.files);
+            }
+        });
+
+        // Form Create Folder
+        document.getElementById('form-create-folder').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('folder-name-input').value.trim();
+            if (!name) return;
+            try {
+                const res = await fetch('/api/repository/folder', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ path: currentPath, name: name })
+                });
+                const data = await res.json();
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    closeFolderModal();
+                    loadRepoContents(currentPath);
+                }
+            } catch (err) {
+                alert('Error creating folder: ' + err);
+            }
+        });
+
+        // Form Rename Item
+        document.getElementById('form-rename-item').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const itemPath = document.getElementById('rename-target-path').value;
+            const newName = document.getElementById('rename-name-input').value.trim();
+            if (!newName) return;
+            try {
+                const res = await fetch('/api/repository/rename', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ path: itemPath, new_name: newName })
+                });
+                const data = await res.json();
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    closeRenameModal();
+                    loadRepoContents(currentPath);
+                }
+            } catch (err) {
+                alert('Error renaming item: ' + err);
+            }
+        });
+
+        // Drag & drop support
+        const container = document.querySelector('.repository-container');
+        const dropZone = document.getElementById('drag-drop-zone');
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            document.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.style.display = 'block';
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.style.display = 'none';
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files && files.length > 0) {
+                uploadFiles(files);
+            }
+        });
+    });
+
+    async function loadRepoContents(path) {
+        currentPath = path;
+        // Update URL query parameter without full page reload
+        const url = new URL(window.location);
+        if (path) {
+            url.searchParams.set('path', path);
+        } else {
+            url.searchParams.delete('path');
+        }
+        window.history.pushState({}, '', url);
+
+        try {
+            const res = await fetch(`/api/repository/list?path=${encodeURIComponent(path)}`);
+            const data = await res.json();
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            renderBreadcrumbs(data.breadcrumbs);
+            renderRepoTable(data.items, data.parent_path);
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    function renderBreadcrumbs(breadcrumbs) {
+        const container = document.getElementById('repo-breadcrumbs');
+        container.innerHTML = '';
+        
+        breadcrumbs.forEach((bc, idx) => {
+            if (idx > 0) {
+                const sep = document.createElement('span');
+                sep.innerText = ' / ';
+                sep.style.color = '#999';
+                container.appendChild(sep);
+            }
+
+            const btn = document.createElement('button');
+            btn.className = 'brutalist-button button-link';
+            btn.style.padding = '4px 10px';
+            btn.style.fontSize = '12px';
+            btn.style.boxShadow = '2px 2px 0px var(--border-color)';
+            btn.innerText = idx === 0 ? '🏠 Root' : `📁 ${bc.name}`;
+            btn.addEventListener('click', () => loadRepoContents(bc.path));
+            container.appendChild(btn);
+        });
+    }
+
+    function renderRepoTable(items, parentPath) {
+        const tbody = document.getElementById('repo-table-body');
+        const emptyState = document.getElementById('repo-empty-state');
+        tbody.innerHTML = '';
+
+        if (parentPath !== null && parentPath !== undefined) {
+            const tr = document.createElement('tr');
+            tr.style.background = '#fafafa';
+            tr.style.borderBottom = '1px solid var(--border-color)';
+            tr.style.cursor = 'pointer';
+            tr.innerHTML = `
+                <td colspan="4" style="padding: 12px 20px; font-weight: 800; color: #444;">
+                    ⬅ .. (Go up)
+                </td>
+            `;
+            tr.addEventListener('click', () => loadRepoContents(parentPath));
+            tbody.appendChild(tr);
+        }
+
+        if (!items || items.length === 0) {
+            if (parentPath === null || parentPath === undefined) {
+                emptyState.style.display = 'block';
+            } else {
+                emptyState.style.display = 'none';
+            }
+            return;
+        }
+
+        emptyState.style.display = 'none';
+
+        items.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid #eee';
+            tr.style.transition = 'background 0.1s ease';
+            tr.onmouseover = () => tr.style.background = '#fcf8ff';
+            tr.onmouseout = () => tr.style.background = 'transparent';
+
+            const icon = item.is_dir ? '📁' : getFileIcon(item.ext);
+            
+            tr.innerHTML = `
+                <td style="padding: 12px 20px; font-weight: 800;">
+                    <div style="display: flex; align-items: center; gap: 10px; cursor: pointer;" class="item-click-target">
+                        <span style="font-size: 18px;">${icon}</span>
+                        <span style="color: var(--text-color);">${escapeHtml(item.name)}</span>
+                    </div>
+                </td>
+                <td style="padding: 12px 15px; font-size: 13px; font-weight: 700; color: #555;">
+                    ${item.is_dir ? '<span class="block-badge" style="background: var(--accent-tertiary); font-size: 10px;">Folder</span>' : item.formatted_size}
+                </td>
+                <td style="padding: 12px 15px; font-size: 12px; font-weight: 600; color: #666;">
+                    ${item.mtime}
+                </td>
+                <td style="padding: 12px 20px; text-align: right;">
+                    <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                        ${!item.is_dir ? `
+                            <button class="brutalist-button btn-preview" style="padding: 4px 8px; font-size: 11px; background: white; box-shadow: 2px 2px 0px var(--border-color);" title="Preview">
+                                👁️
+                            </button>
+                            <a href="/repository/download?path=${encodeURIComponent(item.rel_path)}&download=1" class="brutalist-button button-link" style="padding: 4px 8px; font-size: 11px; box-shadow: 2px 2px 0px var(--border-color);" title="Download">
+                                📥
+                            </a>
+                        ` : ''}
+                        <button class="brutalist-button btn-rename" style="padding: 4px 8px; font-size: 11px; background: var(--accent-color); box-shadow: 2px 2px 0px var(--border-color);" title="Rename">
+                            ✏️
+                        </button>
+                        <button class="brutalist-button btn-delete" style="padding: 4px 8px; font-size: 11px; background: var(--danger-color); color: white; box-shadow: 2px 2px 0px var(--border-color);" title="Delete">
+                            🗑️
+                        </button>
+                    </div>
+                </td>
+            `;
+
+            // Click behavior for name
+            const clickTarget = tr.querySelector('.item-click-target');
+            if (item.is_dir) {
+                clickTarget.addEventListener('click', () => loadRepoContents(item.rel_path));
+            } else {
+                clickTarget.addEventListener('click', () => previewFile(item));
+            }
+
+            // Preview button
+            const previewBtn = tr.querySelector('.btn-preview');
+            if (previewBtn) {
+                previewBtn.addEventListener('click', () => previewFile(item));
+            }
+
+            // Rename button
+            tr.querySelector('.btn-rename').addEventListener('click', () => {
+                document.getElementById('rename-target-path').value = item.rel_path;
+                document.getElementById('rename-name-input').value = item.name;
+                document.getElementById('modal-rename-item').style.display = 'flex';
+                document.getElementById('rename-name-input').focus();
+            });
+
+            // Delete button
+            tr.querySelector('.btn-delete').addEventListener('click', () => {
+                const msg = window.translations[window.currentLang]?.delete_confirm || "Are you sure you want to delete this item?";
+                if (confirm(`${msg}\n"${item.name}"`)) {
+                    deleteItem(item.rel_path);
+                }
+            });
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function uploadFiles(files) {
+        const formData = new FormData();
+        formData.append('path', currentPath);
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+        }
+
+        try {
+            const res = await fetch('/api/repository/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (data.error) {
+                alert(data.error);
+            } else {
+                document.getElementById('hidden-file-input').value = '';
+                loadRepoContents(currentPath);
+            }
+        } catch (err) {
+            alert('Error uploading files: ' + err);
+        }
+    }
+
+    async function deleteItem(itemPath) {
+        try {
+            const res = await fetch('/api/repository/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ path: itemPath })
+            });
+            const data = await res.json();
+            if (data.error) {
+                alert(data.error);
+            } else {
+                loadRepoContents(currentPath);
+            }
+        } catch (err) {
+            alert('Error deleting item: ' + err);
+        }
+    }
+
+    function previewFile(item) {
+        const previewModal = document.getElementById('modal-file-preview');
+        const filenameTitle = document.getElementById('preview-filename');
+        const previewBody = document.getElementById('preview-body');
+
+        filenameTitle.innerText = `📄 ${item.name}`;
+        previewBody.innerHTML = '<div class="loader"></div>';
+        previewModal.style.display = 'flex';
+
+        const fileUrl = `/repository/download?path=${encodeURIComponent(item.rel_path)}&download=0`;
+
+        if (['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(item.ext)) {
+            previewBody.innerHTML = `
+                <div style="width: 100%; max-width: 500px; text-align: center; background: white; padding: 30px; border: 2.5px solid var(--border-color); box-shadow: 4px 4px 0px var(--border-color);">
+                    <div style="font-size: 50px; margin-bottom: 15px;">🎵</div>
+                    <audio controls autoplay style="width: 100%;">
+                        <source src="${fileUrl}">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+            `;
+        } else if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(item.ext)) {
+            previewBody.innerHTML = `
+                <div style="max-width: 100%; max-height: 100%; overflow: auto; text-align: center;">
+                    <img src="${fileUrl}" style="max-width: 100%; max-height: 60vh; border: 2.5px solid var(--border-color); box-shadow: 4px 4px 0px var(--border-color);" alt="${escapeHtml(item.name)}">
+                </div>
+            `;
+        } else if (['txt', 'json', 'csv', 'md', 'xml', 'html', 'js', 'css', 'py', 'eaf'].includes(item.ext)) {
+            fetch(fileUrl)
+                .then(r => r.text())
+                .then(text => {
+                    previewBody.innerHTML = `
+                        <textarea class="brutalist-input" style="width: 100%; height: 50vh; font-family: monospace; font-size: 14px; white-space: pre; resize: none;" readonly>${escapeHtml(text)}</textarea>
+                    `;
+                })
+                .catch(err => {
+                    previewBody.innerHTML = `<p style="color: var(--danger-color); font-weight: 800;">Error loading file text preview: ${err}</p>`;
+                });
+        } else {
+            previewBody.innerHTML = `
+                <div style="text-align: center; padding: 40px; background: white; border: 2.5px solid var(--border-color); box-shadow: 4px 4px 0px var(--border-color);">
+                    <div style="font-size: 40px; margin-bottom: 15px;">📄</div>
+                    <p style="font-weight: 800; font-size: 16px;">Preview not supported for .${item.ext} files.</p>
+                    <a href="${fileUrl}&download=1" class="brutalist-button" style="background: var(--accent-secondary); margin-top: 15px;" data-i18n="download">📥 Download File</a>
+                </div>
+            `;
+        }
+    }
+
+    function closeFolderModal() {
+        document.getElementById('modal-new-folder').style.display = 'none';
+    }
+
+    function closeRenameModal() {
+        document.getElementById('modal-rename-item').style.display = 'none';
+    }
+
+    function closePreviewModal() {
+        const previewModal = document.getElementById('modal-file-preview');
+        const previewBody = document.getElementById('preview-body');
+        // Stop audio playback if playing
+        previewBody.innerHTML = '';
+        previewModal.style.display = 'none';
+    }
+
+    function getFileIcon(ext) {
+        if (['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext)) return '🎵';
+        if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) return '🖼️';
+        if (['txt', 'doc', 'docx', 'pdf', 'md'].includes(ext)) return '📄';
+        if (['json', 'xml', 'csv', 'js', 'py', 'html', 'css'].includes(ext)) return '💻';
+        if (['zip', 'rar', 'tar', 'gz', '7z'].includes(ext)) return '📦';
+        return '📑';
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+</script>
+{% endblock %}

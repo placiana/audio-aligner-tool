@@ -107,14 +107,25 @@
                                 Align
                             {% endif %}
                         </a>
-                        {% if project.type != 'segmentation' %}
-                        <a href="/api/export_elan/{{ item.id }}" class="brutalist-button" style="padding: 6px 12px; font-size: 12px; box-shadow: 2px 2px 0px var(--border-color); background: var(--accent-tertiary);" data-i18n="elan_btn">
-                            ELAN
-                        </a>
-                        {% endif %}
-                        <a href="/api/export_json/{{ item.id }}" class="brutalist-button" style="padding: 6px 12px; font-size: 12px; box-shadow: 2px 2px 0px var(--border-color); background: var(--accent-tertiary);" data-i18n="json_btn">
-                            JSON
-                        </a>
+                        <!-- Export Dropdown Menu -->
+                        <div class="export-dropdown-container" style="position: relative; display: inline-block;">
+                            <button class="brutalist-button export-dropdown-btn" style="padding: 6px 12px; font-size: 12px; box-shadow: 2px 2px 0px var(--border-color); background: var(--accent-tertiary); display: flex; align-items: center; gap: 4px;" data-i18n="export_dropdown_btn">
+                                Export ▾
+                            </button>
+                            <div class="export-dropdown-menu brutalist-card" style="display: none; position: absolute; right: 0; top: calc(100% + 5px); width: 140px; background: white; z-index: 1000; padding: 5px 0; border: 2.5px solid var(--border-color); box-shadow: 3px 3px 0px var(--border-color); flex-direction: column;">
+                                {% if project.type != 'segmentation' %}
+                                <a href="/api/export_elan/{{ item.id }}" class="dropdown-item" style="padding: 8px 12px; font-weight: 800; font-size: 12px; text-decoration: none; color: var(--text-color); display: block; border-bottom: 1.5px solid var(--border-color);" data-i18n="elan_btn">
+                                    ELAN (.eaf)
+                                </a>
+                                {% endif %}
+                                <a href="/api/export_json/{{ item.id }}" class="dropdown-item" style="padding: 8px 12px; font-weight: 800; font-size: 12px; text-decoration: none; color: var(--text-color); display: block; border-bottom: 1.5px solid var(--border-color);" data-i18n="json_btn">
+                                    JSON (.json)
+                                </a>
+                                <a href="/api/export_csv/{{ item.id }}" class="dropdown-item" style="padding: 8px 12px; font-weight: 800; font-size: 12px; text-decoration: none; color: var(--text-color); display: block;" data-i18n="csv_btn">
+                                    CSV (.csv)
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
@@ -127,25 +138,66 @@
         </div>
         
         {% if project.user_role != 'viewer' %}
-        <!-- Right Column: Upload Audio Track Form -->
+        <!-- Right Column: Add Audio Track Form -->
         <div>
             <div style="background: var(--accent-color); border: 2.5px solid var(--border-color); box-shadow: 4px 4px 0px var(--border-color); padding: 20px;">
                 <h3 style="margin-top: 0; font-size: 18px; font-weight: 900; text-transform: uppercase; border-bottom: 2.5px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;" data-i18n="upload_track_title">
                     Upload Track
                 </h3>
                 
-                <form method="post" action="/project/{{ project.id }}/upload" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 15px;">
-                    <div style="display: flex; flex-direction: column; gap: 6px;">
-                        <label for="audio_file" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="audio_file_label">Audio File (.mp3, .wav)</label>
-                        <input type="file" id="audio_file" name="audio_file" accept=".mp3,.wav" required class="brutalist-input" style="background: white;">
+                <!-- Source Mode Tabs -->
+                <div style="display: flex; gap: 0; margin-bottom: 15px; border: 2px solid var(--border-color); background: white;">
+                    <button type="button" id="tab-source-local" class="brutalist-button" style="flex: 1; padding: 8px 4px; font-size: 11px; box-shadow: none; border: none; background: var(--accent-secondary);" data-i18n="upload_source_local">
+                        💻 Local PC
+                    </button>
+                    <button type="button" id="tab-source-repo" class="brutalist-button" style="flex: 1; padding: 8px 4px; font-size: 11px; box-shadow: none; border: none; border-left: 2px solid var(--border-color); background: #eee;" data-i18n="upload_source_repo">
+                        📁 From Repository
+                    </button>
+                </div>
+
+                <form id="form-add-track" method="post" action="/project/{{ project.id }}/upload" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 15px;">
+                    <input type="hidden" name="repo_audio_path" id="repo_audio_path">
+                    <input type="hidden" name="repo_text_path" id="repo_text_path">
+
+                    <!-- Local Upload Inputs Section -->
+                    <div id="section-source-local" style="display: flex; flex-direction: column; gap: 15px;">
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label for="audio_file" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="audio_file_label">Audio File (.mp3, .wav)</label>
+                            <input type="file" id="audio_file" name="audio_file" accept=".mp3,.wav" required class="brutalist-input" style="background: white;">
+                        </div>
+                        
+                        {% if project.type == 'alignment' %}
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label for="text_file" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="text_file_label">Transcription File (.txt) - <span style="font-style: italic; font-weight: 700; color: #444;">Optional</span></label>
+                            <input type="file" id="text_file" name="text_file" accept=".txt" class="brutalist-input" style="background: white;">
+                        </div>
+                        {% endif %}
                     </div>
-                    
-                    {% if project.type == 'alignment' %}
-                    <div style="display: flex; flex-direction: column; gap: 6px;">
-                        <label for="text_file" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="text_file_label">Transcription File (.txt) - <span style="font-style: italic; font-weight: 700; color: #444;">Optional</span></label>
-                        <input type="file" id="text_file" name="text_file" accept=".txt" class="brutalist-input" style="background: white;">
+
+                    <!-- Repository Selection Inputs Section -->
+                    <div id="section-source-repo" style="display: none; flex-direction: column; gap: 15px;">
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="audio_file_label">Audio File (.mp3, .wav)</label>
+                            <button type="button" id="btn-pick-repo-audio" class="brutalist-button" style="background: white; width: 100%; box-shadow: 2px 2px 0px var(--border-color); font-size: 12px;" data-i18n="select_repo_audio_btn">
+                                📁 Choose Audio from Repository
+                            </button>
+                            <div id="display-repo-audio" style="display: none; font-size: 12px; font-weight: 800; background: white; border: 2px solid var(--border-color); padding: 8px 10px; box-shadow: 2px 2px 0px var(--border-color); word-break: break-all;">
+                                <!-- Selected filename -->
+                            </div>
+                        </div>
+
+                        {% if project.type == 'alignment' %}
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="text_file_label">Transcription File (.txt) - <span style="font-style: italic; font-weight: 700; color: #444;">Optional</span></label>
+                            <button type="button" id="btn-pick-repo-text" class="brutalist-button" style="background: white; width: 100%; box-shadow: 2px 2px 0px var(--border-color); font-size: 12px;" data-i18n="select_repo_text_btn">
+                                📁 Choose Text from Repository
+                            </button>
+                            <div id="display-repo-text" style="display: none; font-size: 12px; font-weight: 800; background: white; border: 2px solid var(--border-color); padding: 8px 10px; box-shadow: 2px 2px 0px var(--border-color); word-break: break-all;">
+                                <!-- Selected filename -->
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
                     
                     <button type="submit" class="brutalist-button" style="width: 100%; box-shadow: 2px 2px 0px var(--border-color); background: white;" data-i18n="upload_track_btn">
                         📤 Upload Track
@@ -154,6 +206,27 @@
             </div>
         </div>
         {% endif %}
+    </div>
+</div>
+
+<!-- Modal: Select File from Repository -->
+<div id="repo-picker-modal" class="brutalist-modal" style="display: none;">
+    <div class="brutalist-modal-content" style="max-width: 650px; height: 75vh;">
+        <div class="modal-header">
+            <h2 id="repo-picker-title" data-i18n="repo_picker_title">📁 Choose File from Repository</h2>
+            <button class="brutalist-button modal-close-x" onclick="closeRepoPickerModal()">✕</button>
+        </div>
+        <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+            <!-- Breadcrumbs -->
+            <div id="picker-breadcrumbs" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 800; font-size: 13px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">
+                <!-- Dynamically filled -->
+            </div>
+
+            <!-- Directory Items List -->
+            <div id="picker-items-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+                <!-- Dynamically filled -->
+            </div>
+        </div>
     </div>
 </div>
 
@@ -219,6 +292,28 @@ document.addEventListener('DOMContentLoaded', () => {
             actionsDropdown.style.display = 'none';
         });
     }
+
+    // Toggle Export Dropdowns
+    document.querySelectorAll('.export-dropdown-container').forEach(container => {
+        const btn = container.querySelector('.export-dropdown-btn');
+        const menu = container.querySelector('.export-dropdown-menu');
+
+        btn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Close any other open export menus
+            document.querySelectorAll('.export-dropdown-menu').forEach(m => {
+                if (m !== menu) m.style.display = 'none';
+            });
+            const isDisplayed = menu.style.display === 'flex';
+            menu.style.display = isDisplayed ? 'none' : 'flex';
+        });
+    });
+
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.export-dropdown-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    });
     const closeBtn = document.getElementById('close-collabs-modal');
     const modal = document.getElementById('collabs-modal');
     const collabsListContainer = document.getElementById('collabs-list-container');
@@ -439,6 +534,195 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // --- Source Selection Tabs & Repo Picker ---
+    const tabLocal = document.getElementById('tab-source-local');
+    const tabRepo = document.getElementById('tab-source-repo');
+    const sectionLocal = document.getElementById('section-source-local');
+    const sectionRepo = document.getElementById('section-source-repo');
+    const audioFileInput = document.getElementById('audio_file');
+    const repoAudioPathInput = document.getElementById('repo_audio_path');
+    const repoTextPathInput = document.getElementById('repo_text_path');
+    
+    let activeSource = 'local';
+    let pickerCurrentPath = '';
+
+    if (tabLocal && tabRepo) {
+        tabLocal.addEventListener('click', () => {
+            activeSource = 'local';
+            tabLocal.style.background = 'var(--accent-secondary)';
+            tabRepo.style.background = '#eee';
+            sectionLocal.style.display = 'flex';
+            sectionRepo.style.display = 'none';
+            if (audioFileInput) audioFileInput.required = true;
+        });
+
+        tabRepo.addEventListener('click', () => {
+            activeSource = 'repo';
+            tabRepo.style.background = 'var(--accent-secondary)';
+            tabLocal.style.background = '#eee';
+            sectionRepo.style.display = 'flex';
+            sectionLocal.style.display = 'none';
+            if (audioFileInput) audioFileInput.required = false;
+        });
+    }
+
+    // Buttons to open repository picker
+    const btnPickRepoAudio = document.getElementById('btn-pick-repo-audio');
+    const btnPickRepoText = document.getElementById('btn-pick-repo-text');
+
+    btnPickRepoAudio?.addEventListener('click', () => {
+        openRepoPickerModal('audio');
+    });
+
+    btnPickRepoText?.addEventListener('click', () => {
+        openRepoPickerModal('text');
+    });
+
+    function openRepoPickerModal(fileType) {
+        const modal = document.getElementById('repo-picker-modal');
+        const title = document.getElementById('repo-picker-title');
+        if (title) {
+            title.innerText = fileType === 'audio' 
+                ? (window.currentLang === 'es' ? '🎵 Seleccionar Audio del Repositorio' : '🎵 Select Audio from Repository')
+                : (window.currentLang === 'es' ? '📄 Seleccionar Texto del Repositorio' : '📄 Select Text from Repository');
+        }
+        modal.style.display = 'flex';
+        loadPickerDirectory('', fileType);
+    }
+
+    window.closeRepoPickerModal = function() {
+        document.getElementById('repo-picker-modal').style.display = 'none';
+    };
+
+    async function loadPickerDirectory(path, fileType) {
+        pickerCurrentPath = path;
+        const breadcrumbsContainer = document.getElementById('picker-breadcrumbs');
+        const itemsContainer = document.getElementById('picker-items-list');
+
+        itemsContainer.innerHTML = '<div style="text-align: center; padding: 20px; font-weight: 800;">Loading...</div>';
+
+        try {
+            const res = await fetch(`/api/repository/list?path=${encodeURIComponent(path)}`);
+            const data = await res.json();
+            if (data.error) {
+                itemsContainer.innerHTML = `<div style="color: var(--danger-color); font-weight: 800;">${data.error}</div>`;
+                return;
+            }
+
+            // Render breadcrumbs
+            breadcrumbsContainer.innerHTML = '';
+            data.breadcrumbs.forEach((bc, idx) => {
+                if (idx > 0) {
+                    const sep = document.createElement('span');
+                    sep.innerText = ' / ';
+                    sep.style.color = '#888';
+                    breadcrumbsContainer.appendChild(sep);
+                }
+                const btn = document.createElement('button');
+                btn.className = 'brutalist-button button-link';
+                btn.style.cssText = 'padding: 3px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color);';
+                btn.innerText = idx === 0 ? '🏠 Root' : `📁 ${bc.name}`;
+                btn.addEventListener('click', () => loadPickerDirectory(bc.path, fileType));
+                breadcrumbsContainer.appendChild(btn);
+            });
+
+            // Render items
+            itemsContainer.innerHTML = '';
+
+            if (data.parent_path !== null && data.parent_path !== undefined) {
+                const upRow = document.createElement('div');
+                upRow.style.cssText = 'padding: 8px 12px; border: 2px solid var(--border-color); font-weight: 800; background: #fafafa; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px;';
+                upRow.innerText = '⬅ .. (Go up)';
+                upRow.addEventListener('click', () => loadPickerDirectory(data.parent_path, fileType));
+                itemsContainer.appendChild(upRow);
+            }
+
+            if (!data.items || data.items.length === 0) {
+                const empty = document.createElement('div');
+                empty.style.cssText = 'text-align: center; padding: 30px; font-weight: 800; color: #666; font-size: 13px;';
+                empty.innerText = window.currentLang === 'es' ? 'Carpeta vacía' : 'Folder is empty';
+                itemsContainer.appendChild(empty);
+                return;
+            }
+
+            const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'm4a'];
+            const textExts = ['txt'];
+
+            data.items.forEach(item => {
+                const row = document.createElement('div');
+                row.style.cssText = 'padding: 10px 15px; border: 2px solid var(--border-color); background: white; box-shadow: 2px 2px 0px var(--border-color); display: flex; justify-content: space-between; align-items: center;';
+
+                const left = document.createElement('div');
+                left.style.cssText = 'display: flex; align-items: center; gap: 10px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; font-size: 13px;';
+                const icon = item.is_dir ? '📁' : (audioExts.includes(item.ext) ? '🎵' : '📄');
+                left.innerHTML = `<span>${icon}</span> <span>${escapeHtml(item.name)}</span>`;
+                row.appendChild(left);
+
+                if (item.is_dir) {
+                    const navBtn = document.createElement('button');
+                    navBtn.className = 'brutalist-button';
+                    navBtn.style.cssText = 'padding: 4px 10px; font-size: 11px; background: var(--accent-tertiary); box-shadow: 1px 1px 0px var(--border-color);';
+                    navBtn.innerText = window.currentLang === 'es' ? 'Abrir ➡' : 'Open ➡';
+                    navBtn.addEventListener('click', () => loadPickerDirectory(item.rel_path, fileType));
+                    row.appendChild(navBtn);
+                } else {
+                    const isValidType = fileType === 'audio' ? audioExts.includes(item.ext) : textExts.includes(item.ext);
+                    const selBtn = document.createElement('button');
+                    selBtn.className = 'brutalist-button';
+                    selBtn.style.cssText = `padding: 4px 10px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); ${isValidType ? 'background: var(--accent-secondary); cursor: pointer;' : 'background: #eee; opacity: 0.6; cursor: not-allowed;'}`;
+                    selBtn.innerText = window.currentLang === 'es' ? 'Seleccionar' : 'Select';
+                    selBtn.disabled = !isValidType;
+
+                    if (isValidType) {
+                        selBtn.addEventListener('click', () => {
+                            selectFileFromRepo(item, fileType);
+                        });
+                    }
+                    row.appendChild(selBtn);
+                }
+
+                itemsContainer.appendChild(row);
+            });
+        } catch (err) {
+            itemsContainer.innerHTML = `<div style="color: var(--danger-color); font-weight: 800;">Error: ${err}</div>`;
+        }
+    }
+
+    function selectFileFromRepo(item, fileType) {
+        if (fileType === 'audio') {
+            repoAudioPathInput.value = item.rel_path;
+            const display = document.getElementById('display-repo-audio');
+            if (display) {
+                display.innerText = `🎵 ${item.name}`;
+                display.style.display = 'block';
+            }
+        } else if (fileType === 'text') {
+            repoTextPathInput.value = item.rel_path;
+            const display = document.getElementById('display-repo-text');
+            if (display) {
+                display.innerText = `📄 ${item.name}`;
+                display.style.display = 'block';
+            }
+        }
+        closeRepoPickerModal();
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // Form submit validation for repository mode
+    const formAddTrack = document.getElementById('form-add-track');
+    formAddTrack?.addEventListener('submit', (e) => {
+        if (activeSource === 'repo' && !repoAudioPathInput.value) {
+            e.preventDefault();
+            alert(window.currentLang === 'es' 
+                ? 'Por favor selecciona un archivo de audio de tu repositorio.' 
+                : 'Please select an audio file from your repository.');
+        }
+    });
 });
 </script>
 </div>

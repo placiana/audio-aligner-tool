@@ -49,8 +49,69 @@
         </div>
     </div>
     
-    <!-- Create Project Panel -->
-    <div>
+    <!-- Right Side Panel: Repository Preview & Create Project -->
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+
+        <!-- Your Repository Preview Card -->
+        <div class="brutalist-card repo-preview-card" style="background: #fef9c3; position: relative; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;" onclick="window.location.href='/repository'">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid var(--border-color); padding-bottom: 10px; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 18px; font-weight: 900; text-transform: uppercase; display: flex; align-items: center; gap: 8px;" data-i18n="repo_title">
+                    📁 Your Repository
+                </h3>
+                <span class="block-badge" style="background: var(--accent-secondary); font-size: 11px; padding: 2px 6px;">
+                    {{ repo_summary.file_count }} <span data-i18n="total_files">files</span>
+                </span>
+            </div>
+
+            <p style="margin: 0 0 12px 0; color: #444; font-size: 13px; font-weight: 600;" data-i18n="repo_preview_desc">
+                Isolated personal file repository to upload, organize, and manage your files.
+            </p>
+
+            <!-- Stats pill row -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; text-align: center;">
+                <div style="background: white; border: 2px solid var(--border-color); padding: 6px 2px; box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-size: 15px; font-weight: 900;">{{ repo_summary.file_count }}</div>
+                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #666;" data-i18n="total_files">Files</div>
+                </div>
+                <div style="background: white; border: 2px solid var(--border-color); padding: 6px 2px; box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-size: 15px; font-weight: 900;">{{ repo_summary.folder_count }}</div>
+                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #666;" data-i18n="total_folders">Folders</div>
+                </div>
+                <div style="background: white; border: 2px solid var(--border-color); padding: 6px 2px; box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-size: 13px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ repo_summary.formatted_size }}</div>
+                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #666;" data-i18n="storage_used">Size</div>
+                </div>
+            </div>
+
+            <!-- Preview List of Root Items -->
+            {% if repo_summary.top_items %}
+            <div style="background: white; border: 2px solid var(--border-color); padding: 10px; margin-bottom: 12px; box-shadow: 2px 2px 0px var(--border-color);">
+                <div style="font-size: 10px; font-weight: 900; text-transform: uppercase; color: #777; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 3px;" data-i18n="recent_preview">
+                    Contents Preview
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    {% for item in repo_summary.top_items %}
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700;">
+                        <span style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;">
+                            {% if item.is_dir %}📁{% else %}📄{% endif %} {{ item.name }}
+                        </span>
+                        <span style="font-size: 10px; color: #666; font-weight: 600;">{{ item.formatted_size }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div style="background: white; border: 2px solid var(--border-color); padding: 10px; margin-bottom: 12px; font-size: 12px; font-weight: 700; color: #666; text-align: center;" data-i18n="empty_repo_preview">
+                📭 Repository is empty. Click to upload files!
+            </div>
+            {% endif %}
+
+            <a href="/repository" class="brutalist-button" style="width: 100%; box-shadow: 2px 2px 0px var(--border-color); background: var(--accent-color); text-align: center; text-decoration: none; box-sizing: border-box; font-size: 13px; padding: 10px 15px;" onclick="event.stopPropagation();" data-i18n="open_repo_btn">
+                📁 Open Repository
+            </a>
+        </div>
+
+        <!-- Create Project Panel -->
         <div class="brutalist-card" style="background: var(--accent-tertiary);">
             <h3 style="margin-top: 0; font-size: 18px; font-weight: 900; text-transform: uppercase; border-bottom: 2.5px solid var(--border-color); padding-bottom: 10px;" data-i18n="new_project">
                 New Project
@@ -83,3 +144,4 @@
     </div>
 </div>
 {% endblock %}
+

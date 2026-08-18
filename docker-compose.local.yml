@@ -5,6 +5,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
+      - ./:/app
       - ./uploads:/app/uploads
       - ./db:/app/db
     environment:
