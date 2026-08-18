@@ -89,22 +89,22 @@
 
                 <div id="waveform-segment"></div>
                 
-                <div id="segment-info" style="background: #fef9c3; padding: 12px; border: 2.5px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color); display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                <div id="segment-info" style="background: var(--repo-card-bg, var(--card-bg)); padding: 12px; border: var(--border-width) solid var(--border-color); border-radius: var(--card-radius); box-shadow: var(--shadow-card); display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
                     <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 14px;">
                         <span><span data-i18n="segment_prefix">SEGMENT</span> #<span id="current-segment-idx">0</span> / <span id="total-segments">0</span></span>
                         <span><span data-i18n="duration_label">Duration:</span> <span id="segment-duration">0.00</span>s</span>
                     </div>
                     
                     <!-- Re-segmentation fine-tuning buttons -->
-                    <div style="display: flex; gap: 10px; justify-content: center; align-items: center; border-top: 2px solid var(--border-color); padding-top: 10px;">
+                    <div style="display: flex; gap: 10px; justify-content: center; align-items: center; border-top: var(--border-width) solid var(--border-color); padding-top: 10px;">
                         <span style="font-weight: 800; font-size: 11px; text-transform: uppercase;" data-i18n="fine_tune">Fine-tune:</span>
                         <div style="display: flex; gap: 4px;">
-                            <button id="adj-start-minus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;" data-i18n="adj_start_minus">Start -0.1s</button>
-                            <button id="adj-start-plus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;" data-i18n="adj_start_plus">Start +0.1s</button>
+                            <button id="adj-start-minus" class="brutalist-button secondary-btn" style="padding: 4px 8px; font-size: 11px;" data-i18n="adj_start_minus">Start -0.1s</button>
+                            <button id="adj-start-plus" class="brutalist-button secondary-btn" style="padding: 4px 8px; font-size: 11px;" data-i18n="adj_start_plus">Start +0.1s</button>
                         </div>
                         <div style="display: flex; gap: 4px; margin-left: 10px;">
-                            <button id="adj-end-minus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;" data-i18n="adj_end_minus">End -0.1s</button>
-                            <button id="adj-end-plus" class="brutalist-button" style="padding: 4px 8px; font-size: 11px; box-shadow: 1px 1px 0px var(--border-color); background: white;" data-i18n="adj_end_plus">End +0.1s</button>
+                            <button id="adj-end-minus" class="brutalist-button secondary-btn" style="padding: 4px 8px; font-size: 11px;" data-i18n="adj_end_minus">End -0.1s</button>
+                            <button id="adj-end-plus" class="brutalist-button secondary-btn" style="padding: 4px 8px; font-size: 11px;" data-i18n="adj_end_plus">End +0.1s</button>
                         </div>
                     </div>
                 </div>

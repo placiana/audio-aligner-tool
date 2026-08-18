@@ -3,6 +3,8 @@ import shutil
 from datetime import datetime
 from werkzeug.utils import secure_filename
 
+SYSTEM_UPLOADS_DIR = "System Uploads"
+
 def format_size(size_bytes):
     if size_bytes < 1024:
         return f"{size_bytes} B"
@@ -16,6 +18,8 @@ def format_size(size_bytes):
 def get_user_repo_base(upload_folder, user_id):
     repo_base = os.path.abspath(os.path.join(upload_folder, 'repositories', f"user_{user_id}"))
     os.makedirs(repo_base, exist_ok=True)
+    sys_uploads = os.path.join(repo_base, SYSTEM_UPLOADS_DIR)
+    os.makedirs(sys_uploads, exist_ok=True)
     return repo_base
 
 def safe_join_user_repo(upload_folder, user_id, relative_path=""):
@@ -33,6 +37,15 @@ def safe_join_user_repo(upload_folder, user_id, relative_path=""):
     if rel_from_base == ".":
         rel_from_base = ""
     return target_path, rel_from_base.replace('\\', '/')
+
+def is_system_protected_path(clean_rel):
+    if not clean_rel:
+        return False
+    clean = clean_rel.replace('\\', '/').strip('/')
+    parts = [p for p in clean.split('/') if p]
+    if parts and parts[0] == SYSTEM_UPLOADS_DIR:
+        return True
+    return False
 
 def get_repo_summary(upload_folder, user_id):
     repo_base = get_user_repo_base(upload_folder, user_id)
@@ -66,7 +79,8 @@ def get_repo_summary(upload_folder, user_id):
                 'is_dir': is_dir,
                 'size': size_b,
                 'formatted_size': format_size(size_b) if not is_dir else '',
-                'rel_path': entry
+                'rel_path': entry,
+                'is_protected': (entry == SYSTEM_UPLOADS_DIR)
             })
     except Exception:
         pass
@@ -88,11 +102,14 @@ def list_repo_dir(upload_folder, user_id, relative_path=""):
     if not os.path.isdir(target_path):
         raise ValueError("Requested path is not a directory.")
         
+    is_current_protected = is_system_protected_path(clean_rel)
+    
     items = []
     for entry in os.listdir(target_path):
         full_p = os.path.join(target_path, entry)
         is_dir = os.path.isdir(full_p)
         entry_rel = os.path.join(clean_rel, entry).replace('\\', '/') if clean_rel else entry
+        entry_protected = is_system_protected_path(entry_rel) or entry == SYSTEM_UPLOADS_DIR
         
         stat = os.stat(full_p)
         size_b = 0 if is_dir else stat.st_size
@@ -109,7 +126,8 @@ def list_repo_dir(upload_folder, user_id, relative_path=""):
             'size': size_b,
             'formatted_size': format_size(size_b) if not is_dir else '',
             'mtime': mtime,
-            'ext': ext
+            'ext': ext,
+            'is_protected': entry_protected
         })
         
     # Sort folders first, then files alphabetically
@@ -135,7 +153,8 @@ def list_repo_dir(upload_folder, user_id, relative_path=""):
         'current_path': clean_rel,
         'breadcrumbs': breadcrumbs,
         'parent_path': parent_path,
-        'items': items
+        'items': items,
+        'is_protected': is_current_protected
     }
 
 def create_repo_folder(upload_folder, user_id, relative_path, folder_name):
@@ -147,8 +166,15 @@ def create_repo_folder(upload_folder, user_id, relative_path, folder_name):
         sanitized_name = folder_name.replace(' ', '_').strip(' .')
         if not sanitized_name:
             raise ValueError("Invalid folder name.")
+
+    if folder_name == SYSTEM_UPLOADS_DIR or sanitized_name == SYSTEM_UPLOADS_DIR:
+        raise ValueError(f"'{SYSTEM_UPLOADS_DIR}' is a system reserved folder name.")
             
     target_dir, clean_rel = safe_join_user_repo(upload_folder, user_id, relative_path)
+    
+    if is_system_protected_path(clean_rel):
+        raise ValueError("System Uploads folder is managed by the system and cannot be modified.")
+
     new_folder_path = os.path.join(target_dir, sanitized_name)
     
     # Verify new folder path is inside repo
@@ -162,6 +188,10 @@ def create_repo_folder(upload_folder, user_id, relative_path, folder_name):
 
 def upload_repo_files(upload_folder, user_id, relative_path, files):
     target_dir, clean_rel = safe_join_user_repo(upload_folder, user_id, relative_path)
+    
+    if is_system_protected_path(clean_rel):
+        raise ValueError("Cannot upload directly to System Uploads.")
+
     if not os.path.exists(target_dir):
         os.makedirs(target_dir, exist_ok=True)
         
@@ -181,6 +211,8 @@ def delete_repo_item(upload_folder, user_id, relative_path):
     target_path, clean_rel = safe_join_user_repo(upload_folder, user_id, relative_path)
     if not clean_rel:
         raise ValueError("Cannot delete root directory.")
+    if is_system_protected_path(clean_rel):
+        raise ValueError("System Uploads items are managed by the system and cannot be deleted.")
     if not os.path.exists(target_path):
         raise ValueError("Item does not exist.")
         
@@ -196,6 +228,8 @@ def rename_repo_item(upload_folder, user_id, relative_path, new_name):
     target_path, clean_rel = safe_join_user_repo(upload_folder, user_id, relative_path)
     if not clean_rel:
         raise ValueError("Cannot rename root directory.")
+    if is_system_protected_path(clean_rel):
+        raise ValueError("System Uploads items are managed by the system and cannot be renamed.")
     if not os.path.exists(target_path):
         raise ValueError("Item does not exist.")
         

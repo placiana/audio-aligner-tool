@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+
+{% block title %}User Panel - Audio Aligner{% endblock %}
+
+{% block content %}
+<div style="max-width: 650px; margin: 40px auto;">
+    <div class="brutalist-card">
+        <h2 style="margin-top: 0; font-size: 24px; font-weight: 900; border-bottom: 2.5px solid var(--border-color); padding-bottom: 15px; text-transform: uppercase;" data-i18n="user_panel_title">
+            User Panel
+        </h2>
+
+        <!-- User Information Section -->
+        <div style="margin-bottom: 30px; padding: 15px; background: var(--card-bg); border: var(--border-width) solid var(--border-color); border-radius: var(--card-radius); box-shadow: var(--shadow-card);">
+            <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 16px; font-weight: 900; text-transform: uppercase;" data-i18n="account_info_title">
+                Account Information
+            </h3>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px; font-weight: 700;">
+                <div>
+                    <span style="color: #666;" data-i18n="username_label">Username</span>: 
+                    <span style="color: var(--text-color); font-weight: 900;">{{ g.user.username }}</span>
+                </div>
+                <div>
+                    <span style="color: #666;">Role</span>: 
+                    <span class="block-badge" style="background: {% if g.user.is_admin %}var(--accent-color){% else %}var(--accent-secondary){% endif %}; font-size: 11px; padding: 2px 8px; border: var(--border-width) solid var(--border-color); font-weight: 900; text-transform: uppercase; border-radius: var(--btn-radius);">
+                        {% if g.user.is_admin %}Admin{% else %}User{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Language Selection Section -->
+        <div style="margin-bottom: 30px; padding: 20px; background: var(--card-bg); border: var(--border-width) solid var(--border-color); border-radius: var(--card-radius); box-shadow: var(--shadow-card);">
+            <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 900; text-transform: uppercase;" data-i18n="lang_section_title">
+                Language Preference
+            </h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 10px; border: var(--border-width) solid var(--border-color); border-radius: var(--card-radius); padding: 15px; background: var(--card-bg);">
+                    <input type="radio" name="user_lang_radio" value="es" id="lang-radio-es" onchange="window.setLanguage('es')" style="width: 18px; height: 18px; cursor: pointer;">
+                    <strong style="font-size: 14px;">Español (ES)</strong>
+                </label>
+
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 10px; border: var(--border-width) solid var(--border-color); border-radius: var(--card-radius); padding: 15px; background: var(--card-bg);">
+                    <input type="radio" name="user_lang_radio" value="en" id="lang-radio-en" onchange="window.setLanguage('en')" style="width: 18px; height: 18px; cursor: pointer;">
+                    <strong style="font-size: 14px;">English (EN)</strong>
+                </label>
+            </div>
+        </div>
+
+        <!-- Theme Style Selection Section -->
+        <div style="margin-bottom: 30px; padding: 20px; background: var(--card-bg); border: var(--border-width) solid var(--border-color); border-radius: var(--card-radius); box-shadow: var(--shadow-card);">
+            <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 900; text-transform: uppercase;" data-i18n="theme_section_title">
+                Visual Style / Theme
+            </h3>
+            <form method="post" action="/user/panel" style="display: flex; flex-direction: column; gap: 15px;">
+                <input type="hidden" name="action" value="change_theme">
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px;">
+                    <!-- Option 1: Techno-Retro / Neo-Brutalist -->
+                    <label style="cursor: pointer; display: flex; flex-direction: column; border: var(--border-width) solid var(--border-color); border-radius: var(--card-radius); padding: 15px; background: var(--card-bg); position: relative;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                            <input type="radio" name="theme" value="neo-brutalist" {% if not g.user.theme or g.user.theme == 'neo-brutalist' %}checked{% endif %} onchange="selectTheme('neo-brutalist')" style="width: 18px; height: 18px; cursor: pointer;">
+                            <strong style="font-size: 14px;" data-i18n="theme_neo_brutalist">Techno-Retro</strong>
+                        </div>
+                        <span style="font-size: 12px; opacity: 0.8; font-weight: 600;" data-i18n="theme_neo_brutalist_desc">High contrast, retro-brutalist borders, hard shadows & pastel accents.</span>
+                    </label>
+
+                    <!-- Option 2: Clean & Practical / Modern Light -->
+                    <label style="cursor: pointer; display: flex; flex-direction: column; border: var(--border-width) solid var(--border-color); border-radius: var(--card-radius); padding: 15px; background: var(--card-bg); position: relative;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                            <input type="radio" name="theme" value="clean-light" {% if g.user.theme == 'clean-light' %}checked{% endif %} onchange="selectTheme('clean-light')" style="width: 18px; height: 18px; cursor: pointer;">
+                            <strong style="font-size: 14px;" data-i18n="theme_clean_light">Clean & Practical</strong>
+                        </div>
+                        <span style="font-size: 12px; opacity: 0.8; font-weight: 600;" data-i18n="theme_clean_light_desc">Modern, clean & practical style with smooth rounded corners & soft blue accents.</span>
+                    </label>
+
+                    <!-- Option 3: Warm Earth / Tierra Cálida -->
+                    <label style="cursor: pointer; display: flex; flex-direction: column; border: var(--border-width) solid var(--border-color); border-radius: var(--card-radius); padding: 15px; background: var(--card-bg); position: relative;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                            <input type="radio" name="theme" value="warm-earth" {% if g.user.theme == 'warm-earth' %}checked{% endif %} onchange="selectTheme('warm-earth')" style="width: 18px; height: 18px; cursor: pointer;">
+                            <strong style="font-size: 14px;" data-i18n="theme_warm_earth">Warm Earth</strong>
+                        </div>
+                        <span style="font-size: 12px; opacity: 0.8; font-weight: 600;" data-i18n="theme_warm_earth_desc">Organic & cozy warm palette with olive green, brandy red, apricot cream & golden tones.</span>
+                    </label>
+                </div>
+
+                <button type="submit" class="brutalist-button" style="align-self: flex-start; margin-top: 5px; font-size: 12px; padding: 8px 16px;" data-i18n="save_theme_btn">
+                    Save Theme Choice
+                </button>
+            </form>
+        </div>
+
+        <!-- Change Password Section -->
+        <div style="padding: 20px; background: var(--card-bg); border: var(--border-width) solid var(--border-color); border-radius: var(--card-radius); box-shadow: var(--shadow-card);">
+            <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 900; text-transform: uppercase;" data-i18n="change_password_title">
+                Change Password
+            </h3>
+            <form method="post" action="/user/panel" style="display: flex; flex-direction: column; gap: 20px;">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="current_password" style="font-weight: 800; font-size: 13px; text-transform: uppercase;" data-i18n="current_password_label">Current Password</label>
+                    <input type="password" id="current_password" name="current_password" class="brutalist-input" required autocomplete="current-password">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="new_password" style="font-weight: 800; font-size: 13px; text-transform: uppercase;" data-i18n="new_password_label">New Password</label>
+                    <input type="password" id="new_password" name="new_password" class="brutalist-input" required autocomplete="new-password">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="confirm_password" style="font-weight: 800; font-size: 13px; text-transform: uppercase;" data-i18n="confirm_password_label">Confirm New Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" class="brutalist-input" required autocomplete="new-password">
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-top: 10px;">
+                    <button type="submit" class="brutalist-button" style="flex: 1; background: var(--accent-secondary);" data-i18n="update_password_btn">
+                        Update Password
+                    </button>
+                    <a href="/dashboard" class="brutalist-button secondary-btn button-link" style="flex: 1; text-align: center;" data-i18n="cancel_btn">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function selectTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('user_theme', theme);
+        
+        // Also sync theme asynchronously with server
+        fetch('/api/user/theme', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme: theme })
+        }).catch(err => console.error(err));
+    }
+</script>
+{% endblock %}

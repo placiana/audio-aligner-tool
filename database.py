@@ -75,6 +75,8 @@ def init_db():
     columns = [row['name'] for row in cursor.fetchall()]
     if 'is_admin' not in columns:
         cursor.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;")
+    if 'theme' not in columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN theme TEXT DEFAULT 'neo-brutalist';")
         
     # Check if 'type' column exists in 'projects' table (migration for existing database files)
     cursor.execute("PRAGMA table_info(projects);")
@@ -128,6 +130,31 @@ def get_user_by_id(user_id):
     if user:
         return dict(user)
     return None
+
+def update_user_password(user_id, new_password):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    password_hash = generate_password_hash(new_password)
+    cursor.execute(
+        'UPDATE users SET password_hash = ? WHERE id = ?',
+        (password_hash, user_id)
+    )
+    conn.commit()
+    rows = cursor.rowcount
+    conn.close()
+    return rows > 0
+
+def update_user_theme(user_id, theme):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        'UPDATE users SET theme = ? WHERE id = ?',
+        (theme, user_id)
+    )
+    conn.commit()
+    rows = cursor.rowcount
+    conn.close()
+    return rows > 0
 
 # --- Project Functions ---
 

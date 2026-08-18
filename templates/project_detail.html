@@ -18,11 +18,11 @@
                 </h2>
                 <span class="block-badge" data-i18n="type_{{ project.type }}" style="font-size: 13px; padding: 4px 10px; border: var(--border-width) solid var(--border-color); font-weight: 900; text-transform: uppercase;
                     {% if project.type == 'alignment' %}
-                        background: var(--accent-secondary);
+                        background: var(--accent-secondary); color: var(--sec-btn-text-color, var(--text-color));
                     {% elif project.type == 'transcription' %}
-                        background: var(--accent-tertiary);
+                        background: var(--accent-tertiary); color: var(--text-color);
                     {% else %}
-                        background: var(--accent-color);
+                        background: var(--accent-color); color: var(--btn-text-color, #ffffff);
                     {% endif %}
                 ">
                     {{ project.type }}
@@ -140,17 +140,17 @@
         {% if project.user_role != 'viewer' %}
         <!-- Right Column: Add Audio Track Form -->
         <div>
-            <div style="background: var(--accent-color); border: 2.5px solid var(--border-color); box-shadow: 4px 4px 0px var(--border-color); padding: 20px;">
-                <h3 style="margin-top: 0; font-size: 18px; font-weight: 900; text-transform: uppercase; border-bottom: 2.5px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;" data-i18n="upload_track_title">
+            <div class="brutalist-card" style="padding: 20px;">
+                <h3 style="margin-top: 0; font-size: 18px; font-weight: 900; text-transform: uppercase; border-bottom: var(--border-width) solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;" data-i18n="upload_track_title">
                     Upload Track
                 </h3>
                 
                 <!-- Source Mode Tabs -->
-                <div style="display: flex; gap: 0; margin-bottom: 15px; border: 2px solid var(--border-color); background: white;">
-                    <button type="button" id="tab-source-local" class="brutalist-button" style="flex: 1; padding: 8px 4px; font-size: 11px; box-shadow: none; border: none; background: var(--accent-secondary);" data-i18n="upload_source_local">
+                <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                    <button type="button" id="tab-source-local" class="brutalist-button" style="flex: 1; padding: 8px 4px; font-size: 11px;" data-i18n="upload_source_local">
                         💻 Local PC
                     </button>
-                    <button type="button" id="tab-source-repo" class="brutalist-button" style="flex: 1; padding: 8px 4px; font-size: 11px; box-shadow: none; border: none; border-left: 2px solid var(--border-color); background: #eee;" data-i18n="upload_source_repo">
+                    <button type="button" id="tab-source-repo" class="brutalist-button secondary-btn" style="flex: 1; padding: 8px 4px; font-size: 11px;" data-i18n="upload_source_repo">
                         📁 From Repository
                     </button>
                 </div>
@@ -163,13 +163,13 @@
                     <div id="section-source-local" style="display: flex; flex-direction: column; gap: 15px;">
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             <label for="audio_file" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="audio_file_label">Audio File (.mp3, .wav)</label>
-                            <input type="file" id="audio_file" name="audio_file" accept=".mp3,.wav" required class="brutalist-input" style="background: white;">
+                            <input type="file" id="audio_file" name="audio_file" accept=".mp3,.wav" required class="brutalist-input">
                         </div>
                         
                         {% if project.type == 'alignment' %}
                         <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <label for="text_file" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="text_file_label">Transcription File (.txt) - <span style="font-style: italic; font-weight: 700; color: #444;">Optional</span></label>
-                            <input type="file" id="text_file" name="text_file" accept=".txt" class="brutalist-input" style="background: white;">
+                            <label for="text_file" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="text_file_label">Transcription File (.txt) - <span style="font-style: italic; font-weight: 700;">Optional</span></label>
+                            <input type="file" id="text_file" name="text_file" accept=".txt" class="brutalist-input">
                         </div>
                         {% endif %}
                     </div>
@@ -178,28 +178,28 @@
                     <div id="section-source-repo" style="display: none; flex-direction: column; gap: 15px;">
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="audio_file_label">Audio File (.mp3, .wav)</label>
-                            <button type="button" id="btn-pick-repo-audio" class="brutalist-button" style="background: white; width: 100%; box-shadow: 2px 2px 0px var(--border-color); font-size: 12px;" data-i18n="select_repo_audio_btn">
+                            <button type="button" id="btn-pick-repo-audio" class="brutalist-button secondary-btn" style="width: 100%; font-size: 12px;" data-i18n="select_repo_audio_btn">
                                 📁 Choose Audio from Repository
                             </button>
-                            <div id="display-repo-audio" style="display: none; font-size: 12px; font-weight: 800; background: white; border: 2px solid var(--border-color); padding: 8px 10px; box-shadow: 2px 2px 0px var(--border-color); word-break: break-all;">
+                            <div id="display-repo-audio" style="display: none; font-size: 12px; font-weight: 800; background: var(--card-bg); border: var(--border-width) solid var(--border-color); padding: 8px 10px; border-radius: var(--input-radius); word-break: break-all;">
                                 <!-- Selected filename -->
                             </div>
                         </div>
 
                         {% if project.type == 'alignment' %}
                         <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="text_file_label">Transcription File (.txt) - <span style="font-style: italic; font-weight: 700; color: #444;">Optional</span></label>
-                            <button type="button" id="btn-pick-repo-text" class="brutalist-button" style="background: white; width: 100%; box-shadow: 2px 2px 0px var(--border-color); font-size: 12px;" data-i18n="select_repo_text_btn">
+                            <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="text_file_label">Transcription File (.txt) - <span style="font-style: italic; font-weight: 700;">Optional</span></label>
+                            <button type="button" id="btn-pick-repo-text" class="brutalist-button secondary-btn" style="width: 100%; font-size: 12px;" data-i18n="select_repo_text_btn">
                                 📁 Choose Text from Repository
                             </button>
-                            <div id="display-repo-text" style="display: none; font-size: 12px; font-weight: 800; background: white; border: 2px solid var(--border-color); padding: 8px 10px; box-shadow: 2px 2px 0px var(--border-color); word-break: break-all;">
+                            <div id="display-repo-text" style="display: none; font-size: 12px; font-weight: 800; background: var(--card-bg); border: var(--border-width) solid var(--border-color); padding: 8px 10px; border-radius: var(--input-radius); word-break: break-all;">
                                 <!-- Selected filename -->
                             </div>
                         </div>
                         {% endif %}
                     </div>
                     
-                    <button type="submit" class="brutalist-button" style="width: 100%; box-shadow: 2px 2px 0px var(--border-color); background: white;" data-i18n="upload_track_btn">
+                    <button type="submit" class="brutalist-button" style="width: 100%;" data-i18n="upload_track_btn">
                         📤 Upload Track
                     </button>
                 </form>

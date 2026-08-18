@@ -34,7 +34,24 @@ window.translations = {
         json_btn: "JSON",
         elan_btn: "ELAN",
         logout_btn: "Logout",
-        admin_nav: "⚙️ Admin Panel",
+        user_panel_nav: "User Panel",
+        user_panel_title: "User Panel",
+        account_info_title: "Account Information",
+        change_password_title: "Change Password",
+        current_password_label: "Current Password",
+        new_password_label: "New Password",
+        confirm_password_label: "Confirm New Password",
+        update_password_btn: "Update Password",
+        theme_section_title: "Visual Style / Theme",
+        theme_neo_brutalist: "Techno-Retro",
+        theme_neo_brutalist_desc: "High contrast, retro-brutalist borders, hard shadows & pastel accents.",
+        theme_clean_light: "Clean & Practical",
+        theme_clean_light_desc: "Modern, clean & practical style with smooth rounded corners & soft blue accents.",
+        theme_warm_earth: "Warm Earth",
+        theme_warm_earth_desc: "Organic & cozy warm palette with olive green, brandy red, apricot cream & golden tones.",
+        save_theme_btn: "Save Theme Choice",
+        lang_section_title: "Language Preference",
+        admin_nav: "Admin Panel",
         projects_nav: "📂 Projects",
         back_to_projects: "⬅ Back to Projects",
         login_title: "Sign In",
@@ -49,7 +66,7 @@ window.translations = {
         sign_in_link: "Sign In",
 
         // Repository
-        nav_repo: "📁 Repository",
+        nav_repo: "Repository",
         repo_title: "📁 Your Repository",
         repo_preview_desc: "Isolated personal file repository to upload, organize, and manage your files.",
         open_repo_btn: "📁 Open Repository",
@@ -190,7 +207,24 @@ window.translations = {
         json_btn: "JSON",
         elan_btn: "ELAN",
         logout_btn: "Cerrar sesión",
-        admin_nav: "⚙️ Panel de Admin",
+        user_panel_nav: "Panel de Usuario",
+        user_panel_title: "Panel de Usuario",
+        account_info_title: "Información de la Cuenta",
+        change_password_title: "Cambiar Contraseña",
+        current_password_label: "Contraseña Actual",
+        new_password_label: "Nueva Contraseña",
+        confirm_password_label: "Confirmar Nueva Contraseña",
+        update_password_btn: "Actualizar Contraseña",
+        theme_section_title: "Estilo Visual / Tema",
+        theme_neo_brutalist: "Techno-Retro",
+        theme_neo_brutalist_desc: "Alto contraste, bordes retro-brutalistas, sombras marcadas y acentos pastel.",
+        theme_clean_light: "Claro y Práctico",
+        theme_clean_light_desc: "Estilo moderno, limpio y práctico con bordes redondeados suaves y acentos azules.",
+        theme_warm_earth: "Tierra Cálida",
+        theme_warm_earth_desc: "Paleta cálida y orgánica con tonos oliva, brandy, crema albaricoque y destellos dorados.",
+        save_theme_btn: "Guardar Preferencia de Tema",
+        lang_section_title: "Preferencia de Idioma",
+        admin_nav: "Panel de Admin",
         projects_nav: "📂 Proyectos",
         back_to_projects: "⬅ Volver a Proyectos",
         login_title: "Iniciar Sesión",
@@ -205,7 +239,7 @@ window.translations = {
         sign_in_link: "Iniciar Sesión",
 
         // Repository
-        nav_repo: "📁 Repositorio",
+        nav_repo: "Repositorio",
         repo_title: "📁 Tu Repositorio",
         repo_preview_desc: "Sistema de archivos autocontenido y aislado para organizar, subir y gestionar tus archivos.",
         open_repo_btn: "📁 Abrir Repositorio",
@@ -315,10 +349,22 @@ window.translations = {
     }
 };
 
+window.setLanguage = function (lang) {
+    window.currentLang = lang;
+    localStorage.setItem('aligner_lang', window.currentLang);
+    window.updateLanguageUI();
+    window.dispatchEvent(new Event('languagechanged'));
+};
+
 window.updateLanguageUI = function () {
-    const langBtn = document.getElementById('lang-toggle-btn');
-    if (langBtn) {
-        langBtn.innerText = window.currentLang === 'en' ? '🌐 ES' : '🌐 EN';
+    const radioEs = document.getElementById('lang-radio-es');
+    const radioEn = document.getElementById('lang-radio-en');
+    if (radioEs && radioEn) {
+        if (window.currentLang === 'en') {
+            radioEn.checked = true;
+        } else {
+            radioEs.checked = true;
+        }
     }
 
     document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -353,15 +399,9 @@ window.updateLanguageUI = function () {
 };
 
 window.toggleLanguage = function () {
-    window.currentLang = window.currentLang === 'en' ? 'es' : 'en';
-    localStorage.setItem('aligner_lang', window.currentLang);
-    window.updateLanguageUI();
-
-    // Dispatch a custom event to notify main.js if it is running on this page
-    window.dispatchEvent(new Event('languagechanged'));
+    window.setLanguage(window.currentLang === 'en' ? 'es' : 'en');
 };
 
 document.addEventListener('DOMContentLoaded', () => {
     window.updateLanguageUI();
-    document.getElementById('lang-toggle-btn')?.addEventListener('click', window.toggleLanguage);
 });

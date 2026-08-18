@@ -173,6 +173,52 @@ def dashboard():
     repo_summary = repository.get_repo_summary(app.config['UPLOAD_FOLDER'], g.user['id'])
     return render_template('dashboard.html', projects=projects, repo_summary=repo_summary)
 
+@app.route('/user/panel', methods=['GET', 'POST'])
+@login_required
+def user_panel():
+    if request.method == 'POST':
+        lang = getattr(g, 'lang', 'es')
+        action = request.form.get('action')
+        if action == 'change_theme':
+            theme = request.form.get('theme', 'neo-brutalist')
+            if theme in ['neo-brutalist', 'clean-light', 'warm-earth']:
+                database.update_user_theme(g.user['id'], theme)
+                g.user['theme'] = theme
+                flash('Estilo de tema actualizado correctamente.' if lang == 'es' else 'Theme style updated successfully.', 'success')
+                return redirect(url_for('user_panel'))
+        else:
+            current_password = request.form.get('current_password', '')
+            new_password = request.form.get('new_password', '')
+            confirm_password = request.form.get('confirm_password', '')
+
+            user = database.get_user_by_id(g.user['id'])
+            if not user or not check_password_hash(user['password_hash'], current_password):
+                flash('La contraseña actual es incorrecta.' if lang == 'es' else 'Current password is incorrect.', 'error')
+            elif not new_password:
+                flash('Por favor ingresa una nueva contraseña.' if lang == 'es' else 'Please enter a new password.', 'error')
+            elif len(new_password) < 4:
+                flash('La nueva contraseña debe tener al menos 4 caracteres.' if lang == 'es' else 'New password must be at least 4 characters long.', 'error')
+            elif new_password != confirm_password:
+                flash('Las contraseñas no coinciden.' if lang == 'es' else 'Passwords do not match.', 'error')
+            else:
+                database.update_user_password(g.user['id'], new_password)
+                flash('Contraseña actualizada correctamente.' if lang == 'es' else 'Password updated successfully.', 'success')
+                return redirect(url_for('user_panel'))
+
+    return render_template('user_panel.html')
+
+@app.route('/api/user/theme', methods=['POST'])
+@login_required
+def update_theme_api():
+    data = request.json or {}
+    theme = data.get('theme', 'neo-brutalist')
+    if theme not in ['neo-brutalist', 'clean-light', 'warm-earth']:
+        return jsonify({'error': 'Invalid theme'}), 400
+    
+    database.update_user_theme(g.user['id'], theme)
+    g.user['theme'] = theme
+    return jsonify({'status': 'success', 'theme': theme})
+
 # --- User Repository Views & APIs ---
 
 @app.route('/repository')
@@ -350,6 +396,13 @@ def upload_track(project_id):
     os.makedirs(audio_dir, exist_ok=True)
     os.makedirs(texts_dir, exist_ok=True)
     
+    # System uploads directory inside user's repository
+    sys_uploads_dir = os.path.join(
+        repository.get_user_repo_base(app.config['UPLOAD_FOLDER'], g.user['id']),
+        repository.SYSTEM_UPLOADS_DIR
+    )
+    os.makedirs(sys_uploads_dir, exist_ok=True)
+
     # 1. Save / Copy Audio File
     if repo_audio_path:
         try:
@@ -366,8 +419,11 @@ def upload_track(project_id):
             return redirect(url_for('project_detail', project_id=project_id))
     else:
         audio_filename = secure_filename(audio_file.filename)
+        repo_audio_target = os.path.join(sys_uploads_dir, audio_filename)
+        audio_file.save(repo_audio_target)
+        
         audio_local_path = os.path.join(audio_dir, audio_filename)
-        audio_file.save(audio_local_path)
+        shutil.copy(repo_audio_target, audio_local_path)
         audio_db_path = f"projects/{project_id}/audio/{audio_filename}"
         
     # 2. Save / Copy Text File (optional)
@@ -384,14 +440,20 @@ def upload_track(project_id):
             print(f"Error copying text file from repository: {e}")
     elif text_file and text_file.filename != '':
         text_filename = secure_filename(text_file.filename)
+        repo_text_target = os.path.join(sys_uploads_dir, text_filename)
+        text_file.save(repo_text_target)
+        
         text_local_path = os.path.join(texts_dir, text_filename)
-        text_file.save(text_local_path)
+        shutil.copy(repo_text_target, text_local_path)
         text_db_path = f"projects/{project_id}/texts/{text_filename}"
         
+    repo_audio_rel = repo_audio_path if repo_audio_path else f"{repository.SYSTEM_UPLOADS_DIR}/{audio_filename}"
+
     # Default state structure
     default_state = {
         "audio_path": audio_db_path,
         "text_path": text_db_path,
+        "repo_audio_path": repo_audio_rel,
         "segments": [],
         "current_idx": 0,
         "stage": 1
@@ -594,11 +656,15 @@ def export_json(item_id):
         state = json.loads(item['state_json'])
         segments = state.get('segments', [])
     except:
+        state = {}
         segments = []
         
     audio_filename = item['audio_path'].split('/')[-1]
+    repo_audio_path = state.get('repo_audio_path')
+    if not repo_audio_path:
+        repo_audio_path = f"{repository.SYSTEM_UPLOADS_DIR}/{audio_filename}"
     
-    export_data = []
+    export_segments = []
     for i, seg in enumerate(segments):
         cleaned_seg = {
             "id": seg.get("id", f"seg-{i}"),
@@ -607,7 +673,12 @@ def export_json(item_id):
         }
         if project['type'] != 'segmentation' and 'text' in seg:
             cleaned_seg["text"] = seg["text"]
-        export_data.append(cleaned_seg)
+        export_segments.append(cleaned_seg)
+        
+    export_data = {
+        "audio_file": repo_audio_path,
+        "segments": export_segments
+    }
         
     buffer = BytesIO()
     buffer.write(json.dumps(export_data, indent=2, ensure_ascii=False).encode('utf-8'))

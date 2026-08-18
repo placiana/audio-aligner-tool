@@ -1,10 +1,24 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="{{ g.user.theme if g.user and g.user.theme else 'neo-brutalist' }}">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Audio Aligner{% endblock %}</title>
+    <script>
+        (function() {
+            const serverTheme = "{{ g.user.theme if g.user and g.user.theme else '' }}";
+            if (serverTheme) {
+                localStorage.setItem('user_theme', serverTheme);
+                document.documentElement.setAttribute('data-theme', serverTheme);
+            } else {
+                const savedTheme = localStorage.getItem('user_theme');
+                if (savedTheme) {
+                    document.documentElement.setAttribute('data-theme', savedTheme);
+                }
+            }
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap" rel="stylesheet">
@@ -33,19 +47,19 @@
                 <a href="/" style="text-decoration: none; color: inherit; display: inline-block;">
                     <h1>AUDIO ALIGNER</h1>
                 </a>
-                <button id="lang-toggle-btn" class="brutalist-button secondary-btn" style="padding: 8px 16px; font-weight: 800; font-size: 13px; box-shadow: 2px 2px 0px var(--border-color);">🌐 EN</button>
             </div>
 
             <div class="header-right">
                 {% if g.user %}
                 <div class="dropdown-container" style="position: relative; display: inline-block;">
-                    <button id="user-menu-btn" class="brutalist-button" style="padding: 8px 16px; font-weight: 800; font-size: 13px; box-shadow: 2px 2px 0px var(--border-color); display: flex; align-items: center; gap: 8px; background: white; cursor: pointer;">
-                        👤 {{ g.user.username }} <span style="font-size: 10px; transition: transform 0.2s ease; display: inline-block;">▼</span>
+                    <button id="user-menu-btn" class="brutalist-button secondary-btn" style="padding: 8px 16px; font-weight: 800; font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        {{ g.user.username }} <span style="font-size: 10px; transition: transform 0.2s ease; display: inline-block;">▼</span>
                     </button>
-                    <div id="user-dropdown-menu" class="brutalist-card" style="display: none; position: absolute; right: 0; top: calc(100% + 8px); width: 180px; background: white; z-index: 1000; padding: 5px 0; border: 2.5px solid var(--border-color); box-shadow: 4px 4px 0px var(--border-color); flex-direction: column;">
-                        <a href="/repository" class="dropdown-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--text-color); display: block; border-bottom: 2px solid var(--border-color);" data-i18n="nav_repo">📁 Repositorio</a>
+                    <div id="user-dropdown-menu" class="brutalist-card" style="display: none; position: absolute; right: 0; top: calc(100% + 8px); width: 180px; z-index: 1000; padding: 5px 0; flex-direction: column;">
+                        <a href="/user/panel" class="dropdown-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--text-color); display: block; border-bottom: var(--border-width) solid var(--border-color);" data-i18n="user_panel_nav">User Panel</a>
+                        <a href="/repository" class="dropdown-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--text-color); display: block; border-bottom: var(--border-width) solid var(--border-color);" data-i18n="nav_repo">Repository</a>
                         {% if g.user.is_admin %}
-                        <a href="/admin" class="dropdown-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--text-color); display: block; border-bottom: 2px solid var(--border-color);" data-i18n="admin_nav">⚙️ Admin Panel</a>
+                        <a href="/admin" class="dropdown-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--text-color); display: block; border-bottom: var(--border-width) solid var(--border-color);" data-i18n="admin_nav">Admin Panel</a>
                         {% endif %}
                         <a href="/logout" class="dropdown-item danger-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--danger-color); display: block;" data-i18n="logout_btn">Logout</a>
                     </div>

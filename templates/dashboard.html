@@ -7,42 +7,42 @@
     
     <!-- Projects List -->
     <div>
-        <div class="brutalist-card" style="background: white;">
-            <h2 style="margin-top: 0; font-size: 22px; font-weight: 900; text-transform: uppercase; border-bottom: 2.5px solid var(--border-color); padding-bottom: 15px;" data-i18n="projects_title">
+        <div class="brutalist-card">
+            <h2 style="margin-top: 0; font-size: 22px; font-weight: 900; text-transform: uppercase; border-bottom: var(--border-width) solid var(--border-color); padding-bottom: 15px;" data-i18n="projects_title">
                 Your Workspaces / Projects
             </h2>
             
             {% if projects %}
             <div class="project-list" style="margin-top: 20px;">
                 {% for p in projects %}
-                <div class="project-item" style="border: 2.5px solid var(--border-color); box-shadow: 4px 4px 0px var(--border-color);">
+                <div class="project-item">
                     <div class="project-info">
                         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 5px;">
                             <strong style="display: inline-block; margin-bottom: 0;">{{ p.name }}</strong>
                             <span class="block-badge" data-i18n="type_{{ p.type }}" style="font-size: 11px; padding: 2px 8px; border: var(--border-width) solid var(--border-color); font-weight: 900; text-transform: uppercase; display: inline-block;
                                 {% if p.type == 'alignment' %}
-                                    background: var(--accent-secondary);
+                                    background: var(--accent-secondary); color: var(--sec-btn-text-color, var(--text-color));
                                 {% elif p.type == 'transcription' %}
-                                    background: var(--accent-tertiary);
+                                    background: var(--accent-tertiary); color: var(--text-color);
                                 {% else %}
-                                    background: var(--accent-color);
+                                    background: var(--accent-color); color: var(--btn-text-color);
                                 {% endif %}
                             ">
                                 {{ p.type }}
                             </span>
                         </div>
-                        <p style="margin: 5px 0 0 0; color: #666; font-size: 14px; font-weight: 600;">
+                        <p style="margin: 5px 0 0 0; color: var(--text-color); opacity: 0.8; font-size: 14px; font-weight: 600;">
                             {{ p.description or 'No description provided.' }}
                         </p>
                     </div>
-                    <a href="/project/{{ p.id }}" class="brutalist-button button-link" style="background: var(--accent-secondary); box-shadow: 2px 2px 0px var(--border-color); padding: 8px 16px;" data-i18n="open_btn">
+                    <a href="/project/{{ p.id }}" class="brutalist-button secondary-btn button-link" style="padding: 8px 16px;" data-i18n="open_btn">
                         Open Project
                     </a>
                 </div>
                 {% endfor %}
             </div>
             {% else %}
-            <div style="text-align: center; padding: 40px; font-weight: 800; font-size: 1.1em; color: #555;" data-i18n="no_projects">
+            <div style="text-align: center; padding: 40px; font-weight: 800; font-size: 1.1em; opacity: 0.8;" data-i18n="no_projects">
                 📁 No projects yet. Create a project on the right to get started!
             </div>
             {% endif %}
@@ -53,40 +53,40 @@
     <div style="display: flex; flex-direction: column; gap: 20px;">
 
         <!-- Your Repository Preview Card -->
-        <div class="brutalist-card repo-preview-card" style="background: #fef9c3; position: relative; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;" onclick="window.location.href='/repository'">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid var(--border-color); padding-bottom: 10px; margin-bottom: 12px;">
+        <div class="brutalist-card repo-preview-card" style="position: relative; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;" onclick="window.location.href='/repository'">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: var(--border-width) solid var(--border-color); padding-bottom: 10px; margin-bottom: 12px;">
                 <h3 style="margin: 0; font-size: 18px; font-weight: 900; text-transform: uppercase; display: flex; align-items: center; gap: 8px;" data-i18n="repo_title">
                     📁 Your Repository
                 </h3>
-                <span class="block-badge" style="background: var(--accent-secondary); font-size: 11px; padding: 2px 6px;">
+                <span class="block-badge" style="background: var(--accent-secondary); color: var(--sec-btn-text-color, var(--text-color)); font-size: 11px; padding: 2px 6px;">
                     {{ repo_summary.file_count }} <span data-i18n="total_files">files</span>
                 </span>
             </div>
 
-            <p style="margin: 0 0 12px 0; color: #444; font-size: 13px; font-weight: 600;" data-i18n="repo_preview_desc">
+            <p style="margin: 0 0 12px 0; opacity: 0.8; font-size: 13px; font-weight: 600;" data-i18n="repo_preview_desc">
                 Isolated personal file repository to upload, organize, and manage your files.
             </p>
 
             <!-- Stats pill row -->
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; text-align: center;">
-                <div style="background: white; border: 2px solid var(--border-color); padding: 6px 2px; box-shadow: 2px 2px 0px var(--border-color);">
+                <div class="repo-stat-box">
                     <div style="font-size: 15px; font-weight: 900;">{{ repo_summary.file_count }}</div>
-                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #666;" data-i18n="total_files">Files</div>
+                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; opacity: 0.7;" data-i18n="total_files">Files</div>
                 </div>
-                <div style="background: white; border: 2px solid var(--border-color); padding: 6px 2px; box-shadow: 2px 2px 0px var(--border-color);">
+                <div class="repo-stat-box">
                     <div style="font-size: 15px; font-weight: 900;">{{ repo_summary.folder_count }}</div>
-                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #666;" data-i18n="total_folders">Folders</div>
+                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; opacity: 0.7;" data-i18n="total_folders">Folders</div>
                 </div>
-                <div style="background: white; border: 2px solid var(--border-color); padding: 6px 2px; box-shadow: 2px 2px 0px var(--border-color);">
+                <div class="repo-stat-box">
                     <div style="font-size: 13px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ repo_summary.formatted_size }}</div>
-                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #666;" data-i18n="storage_used">Size</div>
+                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; opacity: 0.7;" data-i18n="storage_used">Size</div>
                 </div>
             </div>
 
             <!-- Preview List of Root Items -->
             {% if repo_summary.top_items %}
-            <div style="background: white; border: 2px solid var(--border-color); padding: 10px; margin-bottom: 12px; box-shadow: 2px 2px 0px var(--border-color);">
-                <div style="font-size: 10px; font-weight: 900; text-transform: uppercase; color: #777; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 3px;" data-i18n="recent_preview">
+            <div class="repo-stat-box" style="padding: 10px; margin-bottom: 12px;">
+                <div style="font-size: 10px; font-weight: 900; text-transform: uppercase; opacity: 0.7; margin-bottom: 6px; border-bottom: 1px solid var(--border-color); padding-bottom: 3px;" data-i18n="recent_preview">
                     Contents Preview
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 5px;">

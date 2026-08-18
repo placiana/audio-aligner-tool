@@ -1,6 +1,7 @@
-:root {
+/* --- THEME 1: Techno-Retro (Neo-Brutalist) - Default --- */
+:root,
+html[data-theme="neo-brutalist"] {
     --bg-color: #faf9f6;
-    /* Off-white / Cream */
     --card-bg: #ffffff;
     --text-color: #1a1a1a;
     --accent-color: #fef08a;
@@ -11,9 +12,93 @@
     /* Soft Lavender */
     --border-color: #1a1a1a;
     --border-width: 2.5px;
+    --card-radius: 0px;
+    --input-radius: 0px;
+    --btn-radius: 0px;
     --shadow-offset: 4px;
+    --shadow-card: 4px 4px 0px var(--border-color);
+    --shadow-btn: 4px 4px 0px var(--border-color);
+    --shadow-btn-hover: 6px 6px 0px var(--border-color);
+    --shadow-input: 3px 3px 0px var(--border-color);
     --danger-color: #fca5a5;
-    /* Pastel Red */
+    --bg-image: radial-gradient(var(--border-color) 0.5px, transparent 0.5px);
+    --bg-size: 20px 20px;
+    --header-bg: var(--accent-tertiary);
+    --btn-text-color: #1a1a1a;
+    --sec-btn-text-color: #1a1a1a;
+    --h1-bg: #1a1a1a;
+    --h1-color: #ffffff;
+    --repo-card-bg: #fef9c3;
+    --progress-bg: #ffffff;
+    --progress-fill: #bbf7d0;
+}
+
+/* --- THEME 2: Claro y Práctico (Clean & Practical) --- */
+html[data-theme="clean-light"] {
+    --bg-color: #f8fafc;
+    /* Slate 50 */
+    --card-bg: #ffffff;
+    --text-color: #0f172a;
+    /* Slate 900 */
+    --accent-color: #7ecdc6;
+    /* Primary Indigo Blue */
+    --accent-secondary: #e2e8f0;
+    /* Soft Slate 200 Secondary */
+    --accent-tertiary: #f1f5f9;
+    /* Slate 100 Header */
+    --border-color: #cbd5e1;
+    /* Slate 300 Border */
+    --border-width: 1px;
+    --card-radius: 10px;
+    --input-radius: 6px;
+    --btn-radius: 6px;
+    --shadow-offset: 0px;
+    --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+    --shadow-btn: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-btn-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+    --shadow-input: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --danger-color: #ef4444;
+    --bg-image: none;
+    --bg-size: auto;
+    --header-bg: #ffffff;
+    --btn-text-color: #ffffff;
+    --sec-btn-text-color: #0f172a;
+    --h1-bg: #7ecdc6;
+    --h1-color: #ffffff;
+    --repo-card-bg: #ffffff;
+    --progress-bg: #e2e8f0;
+    --progress-fill: #7ecdc6;
+}
+
+/* --- THEME 3: Tierra Cálida (Warm Earth) --- */
+html[data-theme="warm-earth"] {
+    --bg-color: #FDF6EF;           /* Seashell warm background */
+    --card-bg: #FFFFFF;            /* Pure white card background */
+    --text-color: #3B1402;         /* Deep Brandy/Espresso text */
+    --accent-color: #842604;       /* Brandy for primary buttons/CTAs */
+    --accent-secondary: #ECC38D;   /* Apricot Cream for secondary elements */
+    --accent-tertiary: #CECB32;    /* Golden Glow for accents & badges */
+    --border-color: #75752B;       /* Olive green border */
+    --border-width: 2px;
+    --card-radius: 8px;
+    --input-radius: 6px;
+    --btn-radius: 6px;
+    --shadow-offset: 3px;
+    --shadow-card: 3px 3px 0px rgba(117, 117, 43, 0.35);
+    --shadow-btn: 2.5px 2.5px 0px #75752B;
+    --shadow-btn-hover: 4px 4px 0px #75752B;
+    --shadow-input: 2px 2px 0px rgba(117, 117, 43, 0.25);
+    --danger-color: #842604;
+    --bg-image: radial-gradient(#75752B 0.5px, transparent 0.5px);
+    --bg-size: 24px 24px;
+    --header-bg: #ECC38D;           /* Apricot Cream header */
+    --btn-text-color: #ffffff;      /* White text on Brandy button */
+    --sec-btn-text-color: #3B1402;  /* Dark text on Apricot button */
+    --h1-bg: #842604;               /* Brandy title badge */
+    --h1-color: #ffffff;            /* White H1 text */
+    --repo-card-bg: #FFFDF9;
+    --progress-bg: #ECC38D;
+    --progress-fill: #842604;
 }
 
 body {
@@ -22,9 +107,8 @@ body {
     padding: 0;
     background-color: var(--bg-color);
     color: var(--text-color);
-    background-image:
-        radial-gradient(var(--border-color) 0.5px, transparent 0.5px);
-    background-size: 20px 20px;
+    background-image: var(--bg-image);
+    background-size: var(--bg-size);
 }
 
 #app {
@@ -33,11 +117,12 @@ body {
     padding: 30px;
 }
 
-/* Brutalist Common Styles */
+/* Common Styles */
 .brutalist-card {
     background: var(--card-bg);
     border: var(--border-width) solid var(--border-color);
-    box-shadow: var(--shadow-offset) var(--shadow-offset) 0px var(--border-color);
+    border-radius: var(--card-radius);
+    box-shadow: var(--shadow-card);
     padding: 25px;
     margin-bottom: 30px;
 }
@@ -45,33 +130,35 @@ body {
 .brutalist-button {
     background: var(--accent-color);
     border: var(--border-width) solid var(--border-color);
-    padding: 12px 24px;
-    color: var(--text-color);
+    border-radius: var(--btn-radius);
+    padding: 10px 20px;
+    color: var(--btn-text-color);
     font-weight: 800;
     text-transform: uppercase;
     cursor: pointer;
-    box-shadow: 4px 4px 0px var(--border-color);
-    transition: all 0.1s ease;
+    box-shadow: var(--shadow-btn);
+    transition: all 0.15s ease;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .brutalist-button:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0px var(--border-color);
+    transform: translate(-1px, -1px);
+    box-shadow: var(--shadow-btn-hover);
 }
 
 .brutalist-button:active,
 .brutalist-button.active {
-    transform: translate(2px, 2px);
-    box-shadow: 0px 0px 0px var(--border-color);
+    transform: translate(1px, 1px);
+    box-shadow: none;
 }
 
 .brutalist-button.secondary-btn {
     background: var(--accent-secondary);
+    color: var(--sec-btn-text-color, var(--text-color));
 }
 
 .brutalist-button.danger-btn {
@@ -80,10 +167,11 @@ body {
 }
 
 .brutalist-input {
-    background: white;
+    background: var(--card-bg);
     border: var(--border-width) solid var(--border-color);
+    border-radius: var(--input-radius);
     padding: 12px 15px;
-    box-shadow: 3px 3px 0px var(--border-color);
+    box-shadow: var(--shadow-input);
     color: var(--text-color);
     outline: none;
     font-size: 14px;
@@ -97,11 +185,11 @@ header {
     align-items: center;
     margin-bottom: 40px;
     gap: 20px;
-    background: var(--accent-tertiary);
-    /* Lavender Header */
+    background: var(--header-bg);
     padding: 20px;
     border: var(--border-width) solid var(--border-color);
-    box-shadow: var(--shadow-offset) var(--shadow-offset) 0px var(--border-color);
+    border-radius: var(--card-radius);
+    box-shadow: var(--shadow-card);
 }
 
 .header-left {
@@ -118,14 +206,14 @@ h1 {
     white-space: nowrap;
     text-transform: uppercase;
     font-style: italic;
-    background: var(--border-color);
-    color: white;
+    background: var(--h1-bg, #1a1a1a);
+    color: var(--h1-color, #ffffff);
     padding: 5px 15px;
+    border-radius: var(--btn-radius);
 }
 
 .button-link {
     text-decoration: none;
-    background: white;
 }
 
 /* Progress Bars */
@@ -170,10 +258,11 @@ h1 {
 .project-item {
     display: flex;
     align-items: center;
-    background: white;
+    background: var(--card-bg);
     padding: 20px;
     border: var(--border-width) solid var(--border-color);
-    box-shadow: 6px 6px 0px var(--border-color);
+    border-radius: var(--card-radius);
+    box-shadow: var(--shadow-card);
     gap: 25px;
 }
 
@@ -190,14 +279,28 @@ h1 {
 
 .project-progress-mini {
     width: 150px;
-    height: 15px;
-    background: white;
+    height: 14px;
+    background: var(--progress-bg, #ffffff);
     border: var(--border-width) solid var(--border-color);
+    border-radius: var(--input-radius);
+    overflow: hidden;
 }
 
 .mini-bar {
     height: 100%;
-    background: var(--accent-secondary);
+    background: var(--progress-fill, var(--accent-secondary));
+}
+
+.repo-preview-card {
+    background: var(--repo-card-bg, var(--card-bg)) !important;
+}
+
+.repo-stat-box {
+    background: var(--card-bg);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--input-radius);
+    box-shadow: var(--shadow-btn);
+    padding: 6px 4px;
 }
 
 /* Stage Layouts */
@@ -238,7 +341,8 @@ h1 {
     flex: 1;
     display: flex;
     flex-direction: column;
-    min-width: 0; /* Breaks WaveSurfer canvas infinite width expansion loop */
+    min-width: 0;
+    /* Breaks WaveSurfer canvas infinite width expansion loop */
 }
 
 #waveform-full,
@@ -249,7 +353,8 @@ h1 {
     box-shadow: 3px 3px 0px var(--border-color);
     margin: 25px 0;
     max-width: 100%;
-    overflow: hidden; /* Prevents nested canvas elements from overflowing or stretching the block */
+    overflow: hidden;
+    /* Prevents nested canvas elements from overflowing or stretching the block */
 }
 
 .text-editor {
@@ -339,7 +444,8 @@ h1 {
     border: none;
     border-right: var(--border-width) solid var(--border-color);
     border-radius: 0;
-    background: white;
+    background: var(--accent-secondary);
+    color: var(--sec-btn-text-color, var(--text-color));
 }
 
 .speed-btn:last-child {
@@ -348,6 +454,7 @@ h1 {
 
 .speed-btn.active {
     background: var(--accent-color);
+    color: var(--btn-text-color, #ffffff);
     transform: none;
     box-shadow: none;
 }
@@ -504,20 +611,23 @@ h1 {
 }
 
 .inline-highlight.aligned {
-    background-color: #f3e8ff; /* Soft pastel lavender purple */
+    background-color: #f3e8ff;
+    /* Soft pastel lavender purple */
     border: 1.5px solid #d8b4fe;
     color: #5b21b6;
     box-shadow: 2px 2px 0px var(--border-color);
 }
 
 .inline-highlight.aligned:hover {
-    background-color: #e0f2fe; /* Light sky blue */
+    background-color: #e0f2fe;
+    /* Light sky blue */
     border-color: #7dd3fc;
     color: #0369a1;
 }
 
 .inline-highlight.active {
-    background-color: var(--accent-color); /* Bright yellow */
+    background-color: var(--accent-color);
+    /* Bright yellow */
     border: 2.5px solid var(--border-color);
     color: var(--text-color);
     font-weight: 800;
@@ -542,7 +652,8 @@ h1 {
 }
 
 .inline-highlight.active::after {
-    background: var(--accent-secondary); /* Soft mint green */
+    background: var(--accent-secondary);
+    /* Soft mint green */
     color: var(--text-color);
     border: 1.5px solid var(--border-color);
     box-shadow: 1.5px 1.5px 0px var(--border-color);
