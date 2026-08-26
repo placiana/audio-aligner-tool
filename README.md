@@ -30,7 +30,7 @@ The Audio Aligner service runs on a Flask backend and offers a multi-user worksp
    - **Fine-Tune Timings (Re-segmentation):** Adjust the start/end boundaries of the active segment dynamically by `+/- 0.1` seconds without going back to Stage 1.
    - Zoom controls are also available for the segment waveform.
 6. **ELAN Export:** Export time-aligned transcriptions to native ELAN `.eaf` XML files containing a single transcription tier with millisecond precision.
-7. **Consolidated Migration:** When a user first registers, the server searches for legacy local `config.json` and `state.json` files and automatically migrates them into a project named *Toba Bible (Imported)*.
+7. **Clean Workspace:** New user accounts are created with a clean workspace ready to create custom projects.
 
 ---
 
@@ -98,6 +98,21 @@ The application will be running at `http://localhost:5000`.
 Data directories (`uploads/`) and the database directory (`db/`) are bound as volumes on the host system to ensure persistence across container updates.
 
 Additionally, user registration can be disabled by setting the environment variable `ALLOW_REGISTRATION=false` in the `docker-compose.yml` file. If disabled, the registration link on the login page will be hidden, and direct access to `/register` will be blocked.
+
+#### Google OAuth2 Authentication Setup
+To enable Google Sign-In & Registration:
+1. Obtain OAuth 2.0 Credentials (Client ID & Client Secret) from [Google Cloud Console](https://console.cloud.google.com/).
+2. Set the redirect URI to `http://localhost:5000/auth/google/callback` (or your domain URI).
+3. Create a `.env` file in the root directory (or copy `.env.example`):
+   ```env
+   GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+   GOOGLE_CLIENT_SECRET="your-client-secret"
+   ```
+   Or export them directly in your shell / `docker-compose.yml`:
+   ```bash
+   export GOOGLE_CLIENT_ID="your-google-client-id"
+   export GOOGLE_CLIENT_SECRET="your-google-client-secret"
+   ```
 
 ---
 

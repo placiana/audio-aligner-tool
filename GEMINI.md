@@ -65,6 +65,12 @@ python app.py
 ```
 By default, the application will be available at `http://localhost:5000`.
 
+To enable Google Auth (Login & Registration), create a `.env` file (see `.env.example`) or export `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`:
+```env
+GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="your-client-secret"
+```
+
 ## Development Conventions
 
 *   **State Management:** The application is "stateless" on the server-side beyond writing to `state.json`. All alignment logic is handled in the frontend and synced via `/api/save_state`.

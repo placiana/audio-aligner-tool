@@ -77,6 +77,10 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;")
     if 'theme' not in columns:
         cursor.execute("ALTER TABLE users ADD COLUMN theme TEXT DEFAULT 'neo-brutalist';")
+    if 'google_id' not in columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN google_id TEXT;")
+    if 'email' not in columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN email TEXT;")
         
     # Check if 'type' column exists in 'projects' table (migration for existing database files)
     cursor.execute("PRAGMA table_info(projects);")
@@ -130,6 +134,69 @@ def get_user_by_id(user_id):
     if user:
         return dict(user)
     return None
+
+def get_user_by_google_id(google_id):
+    if not google_id:
+        return None
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE google_id = ?', (google_id,))
+    user = cursor.fetchone()
+    conn.close()
+    if user:
+        return dict(user)
+    return None
+
+def get_user_by_email(email):
+    if not email:
+        return None
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+    user = cursor.fetchone()
+    conn.close()
+    if user:
+        return dict(user)
+    return None
+
+def link_google_id(user_id, google_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE users SET google_id = ? WHERE id = ?', (google_id, user_id))
+    conn.commit()
+    conn.close()
+
+def create_google_user(username, email, google_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT COUNT(*) FROM users')
+        user_count = cursor.fetchone()[0]
+        is_admin = 1 if user_count == 0 else 0
+        
+        # Unique username check / adjustment
+        base_username = username or (email.split('@')[0] if email else 'user')
+        final_username = base_username
+        counter = 1
+        while True:
+            cursor.execute('SELECT id FROM users WHERE username = ?', (final_username,))
+            if not cursor.fetchone():
+                break
+            final_username = f"{base_username}_{counter}"
+            counter += 1
+
+        cursor.execute(
+            'INSERT INTO users (username, password_hash, is_admin, google_id, email) VALUES (?, ?, ?, ?, ?)',
+            (final_username, '', is_admin, google_id, email)
+        )
+        conn.commit()
+        user_id = cursor.lastrowid
+        return user_id
+    except sqlite3.IntegrityError:
+        return None
+    finally:
+        conn.close()
+
 
 def update_user_password(user_id, new_password):
     conn = get_db_connection()

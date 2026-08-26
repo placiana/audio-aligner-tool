@@ -2,6 +2,8 @@ import os
 import json
 import shutil
 import csv
+import urllib.parse
+import requests
 from flask import Flask, render_template, request, jsonify, send_from_directory, send_file, session, g, redirect, url_for, flash
 from io import BytesIO, StringIO
 from pydub import AudioSegment, silence
@@ -12,66 +14,33 @@ import elan_exporter
 import repository
 
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 app = Flask(__name__)
 app.secret_key = 'aligner-secret-session-key' # Change to a secure random string in production
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 ALLOW_REGISTRATION = os.environ.get('ALLOW_REGISTRATION', 'true').lower() == 'true'
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '').strip()
 
 @app.context_processor
 def inject_registration_status():
-    return dict(allow_registration=ALLOW_REGISTRATION)
+    return dict(
+        allow_registration=ALLOW_REGISTRATION,
+        google_auth_enabled=bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+    )
 
 # Initialize SQLite database and tables
 database.init_db()
 
 # Ensure base uploads directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-# Helper function to seed default projects for a new user
-def seed_default_project(user_id):
-    config_file = 'config.json'
-    state_file = 'state.json'
-    
-    if os.path.exists(config_file):
-        try:
-            with open(config_file, 'r') as f:
-                config_data = json.load(f)
-            
-            state_data = {}
-            if os.path.exists(state_file):
-                with open(state_file, 'r') as f:
-                    try:
-                        state_data = json.load(f)
-                    except:
-                        state_data = {}
-                        
-            project_id = database.create_project(
-                "Toba Bible (Imported)", 
-                "Migrated automatically from local JSON config & state.", 
-                "alignment",
-                user_id
-            )
-            
-            for item in config_data:
-                audio_path = item.get('audio_path')
-                text_path = item.get('text_path')
-                
-                # Fetch state if exists
-                item_state = state_data.get(audio_path, {
-                    "audio_path": audio_path,
-                    "text_path": text_path,
-                    "segments": [],
-                    "current_idx": 0,
-                    "stage": 1
-                })
-                item_state['audio_path'] = audio_path
-                item_state['text_path'] = text_path
-                
-                database.create_audio_item(project_id, audio_path, text_path, json.dumps(item_state))
-        except Exception as e:
-            print(f"Error seeding database: {e}")
 
 # --- Authentication Middleware & Hooks ---
 
@@ -125,9 +94,6 @@ def register():
             flash('Username already exists.', 'error')
             return render_template('register.html')
             
-        # Seed default project if local JSON files are found
-        seed_default_project(user_id)
-        
         flash('Account created successfully! Please sign in.', 'success')
         return redirect(url_for('login'))
         
@@ -158,6 +124,110 @@ def logout():
     session.clear()
     flash('Logged out successfully.', 'success')
     return redirect(url_for('login'))
+
+@app.route('/auth/google')
+def auth_google():
+    if not GOOGLE_CLIENT_ID:
+        flash('La autenticación con Google no está configurada en el servidor (falta GOOGLE_CLIENT_ID).', 'error')
+        return redirect(url_for('login'))
+        
+    redirect_uri = url_for('google_callback', _external=True)
+    google_auth_url = (
+        "https://accounts.google.com/o/oauth2/v2/auth?" +
+        urllib.parse.urlencode({
+            "client_id": GOOGLE_CLIENT_ID,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": "openid email profile",
+            "prompt": "select_account"
+        })
+    )
+    return redirect(google_auth_url)
+
+@app.route('/auth/google/callback')
+def google_callback():
+    code = request.args.get('code')
+    error = request.args.get('error')
+    
+    if error or not code:
+        flash('Ocurrió un error o se canceló el inicio de sesión con Google.', 'error')
+        return redirect(url_for('login'))
+        
+    redirect_uri = url_for('google_callback', _external=True)
+    
+    try:
+        # Exchange authorization code for tokens
+        token_resp = requests.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": redirect_uri
+            },
+            timeout=10
+        )
+        
+        if token_resp.status_code != 200:
+            flash('No se pudo verificar el token con Google.', 'error')
+            return redirect(url_for('login'))
+            
+        token_data = token_resp.json()
+        access_token = token_data.get('access_token')
+        
+        # Fetch user info from Google
+        user_info_resp = requests.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10
+        )
+        
+        if user_info_resp.status_code != 200:
+            flash('No se pudo obtener el perfil de usuario de Google.', 'error')
+            return redirect(url_for('login'))
+            
+        user_info = user_info_resp.json()
+        google_id = user_info.get('sub')
+        email = user_info.get('email')
+        name = user_info.get('name') or (email.split('@')[0] if email else 'User')
+        
+        if not google_id:
+            flash('Respuesta de autenticación de Google no válida.', 'error')
+            return redirect(url_for('login'))
+            
+        # 1. Lookup user by google_id
+        user = database.get_user_by_google_id(google_id)
+        
+        # 2. Lookup user by email and link google_id if exists
+        if not user and email:
+            user = database.get_user_by_email(email)
+            if user:
+                database.link_google_id(user['id'], google_id)
+                user['google_id'] = google_id
+                
+        # 3. Register new user if not found
+        if not user:
+            if not ALLOW_REGISTRATION:
+                flash('El registro de nuevos usuarios está deshabilitado en este servidor.', 'error')
+                return redirect(url_for('login'))
+                
+            user_id = database.create_google_user(username=name, email=email, google_id=google_id)
+            if not user_id:
+                flash('No se pudo crear la cuenta con Google.', 'error')
+                return redirect(url_for('login'))
+                
+            user = database.get_user_by_id(user_id)
+            
+        session.clear()
+        session['user_id'] = user['id']
+        flash('¡Sesión iniciada correctamente con Google!', 'success')
+        return redirect(url_for('dashboard'))
+        
+    except Exception as e:
+        flash(f'Error al conectar con Google: {str(e)}', 'error')
+        return redirect(url_for('login'))
+
 
 # --- Dashboard & Project Views ---
 
