@@ -1,0 +1,622 @@
+/* --- FINANCIAL TIMES CLEAN EDITORIAL DESIGN SYSTEM (V2) --- */
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+    --ft-paper: #FFF1E5;
+    /* Iconic FT warm salmon-cream paper background */
+    --ft-paper-dark: #F2E3D5;
+    /* Subtly darker salmon for section fills */
+    --ft-card: #FFFFFF;
+    /* Pure white clean cards */
+    --ft-claret: #990F3D;
+    /* FT Signature Claret / Burgundy */
+    --ft-claret-dark: #4A0C27;
+    /* Deep Oxford Burgundy */
+    --ft-ink: #262626;
+    /* Charcoal ink text */
+    --ft-ink-muted: #666666;
+    /* Muted text */
+    --ft-border: #d7cbb9;
+    /* Crisp hairline border */
+    --ft-teal: #00665e;
+    /* FT Slate Teal secondary */
+    --ft-gold: #cbb483;
+    /* Warm gold highlight */
+
+    --font-serif: 'Lora', Georgia, serif;
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: var(--ft-paper);
+    color: var(--ft-ink);
+    margin: 0;
+    padding: 0;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+#v2-app {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 30px 20px;
+}
+
+/* Header & Masthead */
+.v2-header {
+    background: var(--ft-paper);
+    border-top: 4px solid var(--ft-claret);
+    border-bottom: 1px solid var(--ft-border);
+    padding: 16px 24px;
+    margin-bottom: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.v2-masthead-title {
+    font-family: var(--font-serif);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--ft-claret-dark);
+    letter-spacing: -0.5px;
+    margin: 0;
+    text-transform: capitalize;
+}
+
+.v2-masthead-sub {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--ft-ink-muted);
+    margin-top: 2px;
+}
+
+/* Editorial Cards */
+.ft-card {
+    background: var(--ft-card);
+    border: 1px solid var(--ft-border);
+    border-radius: 0px;
+    padding: 24px;
+    margin-bottom: 25px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ft-card:hover {
+    border-color: #bfae98;
+}
+
+.ft-card-header {
+    border-bottom: 2px solid var(--ft-ink);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ft-card-title {
+    font-family: var(--font-serif);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ft-ink);
+    margin: 0;
+}
+
+/* Financial Times Buttons */
+.ft-button {
+    background-color: var(--ft-claret);
+    color: #ffffff;
+    border: 1px solid var(--ft-claret-dark);
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 10px 18px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background-color 0.15s ease;
+    border-radius: 0px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ft-button:hover {
+    background-color: var(--ft-claret-dark);
+}
+
+.ft-button.secondary {
+    background-color: transparent;
+    color: var(--ft-ink);
+    border: 1px solid var(--ft-border);
+}
+
+.ft-button.secondary:hover {
+    background-color: var(--ft-paper-dark);
+    border-color: var(--ft-ink-muted);
+}
+
+.ft-button.teal {
+    background-color: var(--ft-teal);
+    border-color: #004d47;
+}
+
+/* Inputs & Forms */
+.ft-input {
+    background-color: #ffffff;
+    border: 1px solid var(--ft-border);
+    color: var(--ft-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    padding: 10px 14px;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.ft-input:focus {
+    border-color: var(--ft-claret);
+}
+
+/* Badges & Labels */
+.ft-badge {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 3px 8px;
+    background: var(--ft-paper-dark);
+    color: var(--ft-ink);
+    border: 1px solid var(--ft-border);
+    display: inline-block;
+}
+
+.ft-badge.claret {
+    background: var(--ft-claret);
+    color: white;
+    border: none;
+}
+
+.ft-badge.teal {
+    background: var(--ft-teal);
+    color: white;
+    border: none;
+}
+
+/* Projects Grid */
+.ft-project-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.ft-project-item {
+    background: white;
+    border: 1px solid var(--ft-border);
+    border-top: 3px solid var(--ft-claret);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.ft-project-item:hover {
+    transform: translateY(-2px);
+    border-color: var(--ft-claret);
+}
+
+.ft-project-name {
+    font-family: var(--font-serif);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ft-ink);
+    margin: 0 0 8px 0;
+}
+
+.ft-project-desc {
+    font-size: 13px;
+    color: var(--ft-ink-muted);
+    margin: 0 0 15px 0;
+    line-height: 1.4;
+}
+
+/* Modal */
+.ft-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(38, 38, 38, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+}
+
+.ft-modal-content {
+    background: var(--ft-paper);
+    /*border: 2px solid var(--ft-claret); */
+    width: 90%;
+    max-width: 600px;
+    padding: 30px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.ft-modal-header {
+    border-bottom: 2px solid var(--ft-claret);
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ft-modal-header h2 {
+    font-family: var(--font-serif);
+    font-size: 22px;
+    color: var(--ft-claret-dark);
+    margin: 0;
+}
+
+/* Project Type Selection Cards in Modal */
+.project-type-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px 18px;
+    background: #ffffff;
+    border: 1px solid var(--ft-border);
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    user-select: none;
+}
+
+.project-type-card:hover {
+    border-color: var(--ft-claret);
+    background: #fff8f5;
+}
+
+.project-type-card.selected {
+    border: 2px solid var(--ft-claret);
+    background: #fff5ee;
+    box-shadow: inset 4px 0 0 var(--ft-claret);
+}
+
+.project-type-card .pt-icon {
+    font-size: 26px;
+    line-height: 1;
+    margin-top: 2px;
+}
+
+.project-type-card .pt-info {
+    flex: 1;
+}
+
+.project-type-card .pt-title {
+    font-family: var(--font-serif);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ft-claret-dark);
+}
+
+.project-type-card .pt-desc {
+    font-size: 12px;
+    color: var(--ft-ink-muted);
+    margin-top: 3px;
+    line-height: 1.4;
+}
+
+.ft-badge.translation {
+    background: var(--ft-gold);
+    color: var(--ft-ink);
+    border: 1px solid #b8a06e;
+}
+
+/* DAW Column Track Layout */
+.daw-channels-container,
+#v2-channels-container {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 20px;
+    overflow-x: auto;
+    padding-bottom: 20px;
+    align-items: stretch;
+}
+
+.daw-channel-column {
+    background: #ffffff;
+    border: 1px solid var(--ft-border);
+    border-top: 4px solid var(--ft-claret);
+    min-width: 320px;
+    width: 340px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.daw-channel-header {
+    border-bottom: 2px solid var(--ft-ink);
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.daw-channel-type-badge {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 3px 8px;
+}
+
+.daw-channel-name-link {
+    font-family: var(--font-serif);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ft-ink);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.daw-channel-name-link:hover {
+    color: var(--ft-claret);
+}
+
+.daw-channel-add-media-btn {
+    width: 100%;
+    margin-top: 6px;
+    padding: 8px 12px;
+    font-size: 11px;
+}
+
+.daw-slots-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-grow: 1;
+    min-height: 120px;
+    max-height: 520px;
+    overflow-y: auto;
+    padding-right: 4px;
+    margin-top: 10px;
+}
+
+.daw-slots-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.daw-slots-container::-webkit-scrollbar-track {
+    background: #f1eae1;
+}
+
+.daw-slots-container::-webkit-scrollbar-thumb {
+    background: var(--ft-border);
+}
+
+.daw-slots-container::-webkit-scrollbar-thumb:hover {
+    background: var(--ft-claret);
+}
+
+.daw-empty-slot-placeholder {
+    border: 2px dashed var(--ft-border);
+    background: #faf8f5;
+    padding: 20px 14px;
+    text-align: center;
+    color: var(--ft-ink-muted);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* DAW Slot Cells (Compact Audio & Media Cells) */
+.daw-slot-cell {
+    padding: 12px 14px;
+    border-radius: 0px;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    user-select: none;
+}
+
+.daw-slot-cell:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+/* 🔴 RAW Cell Style (Newly uploaded, unsegmented - Red) */
+.daw-slot-cell.slot-raw {
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-left: 4px solid #ef4444;
+}
+
+.daw-slot-cell.slot-raw:hover {
+    border-color: #ef4444;
+}
+
+/* 🟡 SEGMENTED Cell Style (Processed into segments, not aligned - Yellow) */
+.daw-slot-cell.slot-segmented {
+    background-color: #fefce8;
+    border: 1px solid #fef08a;
+    border-left: 4px solid #eab308;
+}
+
+.daw-slot-cell.slot-segmented:hover {
+    border-color: #eab308;
+}
+
+/* 🟠 PARTIAL ALIGNED Cell Style (Some segments aligned - Orange) */
+.daw-slot-cell.slot-partial {
+    background-color: #fff7ed;
+    border: 1px solid #ffedd5;
+    border-left: 4px solid #f97316;
+}
+
+.daw-slot-cell.slot-partial:hover {
+    border-color: #f97316;
+}
+
+/* 🟢 TOTALLY ALIGNED Cell Style (All segments aligned against all channels - Green) */
+.daw-slot-cell.slot-aligned {
+    background-color: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-left: 4px solid #22c55e;
+}
+
+.daw-slot-cell.slot-aligned:hover {
+    border-color: #22c55e;
+}
+
+.slot-status-badge {
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 2px 6px;
+    display: inline-block;
+}
+
+.slot-status-badge.raw {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+.slot-status-badge.segmented {
+    background: #ca8a04;
+    color: #ffffff;
+}
+
+.slot-status-badge.partial {
+    background: #ea580c;
+    color: #ffffff;
+}
+
+.slot-status-badge.aligned {
+    background: #16a34a;
+    color: #ffffff;
+}
+
+.slot-cell-filename {
+    font-family: var(--font-serif);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ft-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Alignment View ("Alinear") Styles */
+.aligner-columns-container {
+    display: grid;
+    gap: 16px;
+    padding-bottom: 20px;
+    align-items: stretch;
+    width: 100%;
+}
+
+.aligner-channel-header {
+    padding: 14px 16px;
+    background: #fafafa;
+    border: 2px solid var(--ft-border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+
+.aligner-row-cell {
+    display: flex;
+    flex-direction: column;
+}
+
+.aligner-empty-cell {
+    height: 100%;
+    min-height: 80px;
+    background: #f8fafc;
+    border: 1px dashed var(--ft-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ft-ink-muted);
+    font-size: 11px;
+    font-style: italic;
+}
+
+.aligner-segment-card {
+    padding: 12px;
+    border-radius: 0px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 0.15s ease;
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+}
+
+.aligner-segment-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.aligner-segment-card.selected-segment-card {
+    outline: 3px solid var(--ft-claret);
+    outline-offset: -2px;
+    box-shadow: 0 0 12px rgba(153, 15, 61, 0.25) !important;
+}
+
+/* Verde: Match con segmento de TODOS los canales */
+.aligner-segment-card.status-all {
+    background-color: #f0fdf4;
+    border: 1px solid #86efac;
+    border-left: 5px solid #16a34a;
+}
+
+/* Amarillo: Match con al menos UN canal restante */
+.aligner-segment-card.status-partial {
+    background-color: #fefce8;
+    border: 1px solid #fde047;
+    border-left: 5px solid #ca8a04;
+}
+
+/* Rosadito/Blanco: Sin matches asignados */
+.aligner-segment-card.status-none {
+    background-color: #fff5f5;
+    border: 1px solid #fed7d7;
+    border-left: 5px solid #e53e3e;
+}
+
+.slot-cell-hint {
+    font-size: 11px;
+    color: var(--ft-ink-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}

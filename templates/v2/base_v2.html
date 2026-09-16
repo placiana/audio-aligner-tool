@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Audio Aligner - Editorial Edition{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_v2.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+    <div id="v2-app">
+        <!-- Financial Times Style Masthead Header -->
+        <header class="v2-header">
+            <div>
+                <h1 class="v2-masthead-title">Audio Aligner</h1>
+                <div class="v2-masthead-sub">Multi-Channel Alignment & Translation Engine</div>
+            </div>
+
+            <div style="display: flex; gap: 15px; align-items: center;">
+                {% if g.user %}
+                <span class="ft-badge" style="font-size: 11px;">{{ g.user.username }}</span>
+                <a href="/logout" class="ft-button secondary" style="font-size: 11px; padding: 6px 12px;">Log Out</a>
+                {% endif %}
+            </div>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div style="margin-bottom: 20px;">
+            {% for category, message in messages %}
+            <div
+                style="padding: 12px 18px; border: 1px solid var(--ft-claret); background: white; color: var(--ft-claret-dark); font-weight: 600; font-size: 14px; margin-bottom: 10px;">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+</body>
+
+</html>

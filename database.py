@@ -69,7 +69,78 @@ def init_db():
             FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
         );
     ''')
+
+    # --- Module V2 Relational Schema ---
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS v2_channels (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            json_channel_id INTEGER,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            channel_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS v2_media (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_id INTEGER NOT NULL,
+            json_media_id INTEGER,
+            filename TEXT NOT NULL,
+            media_type TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (channel_id) REFERENCES v2_channels(id) ON DELETE CASCADE
+        );
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS v2_segments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_id INTEGER NOT NULL,
+            media_id INTEGER NOT NULL,
+            json_segment_id INTEGER,
+            start_time REAL,
+            end_time REAL,
+            text_content TEXT,
+            segment_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (channel_id) REFERENCES v2_channels(id) ON DELETE CASCADE,
+            FOREIGN KEY (media_id) REFERENCES v2_media(id) ON DELETE CASCADE
+        );
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS v2_matches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS v2_match_segments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            match_id INTEGER NOT NULL,
+            segment_id INTEGER NOT NULL,
+            channel_id INTEGER NOT NULL,
+            media_id INTEGER NOT NULL,
+            FOREIGN KEY (match_id) REFERENCES v2_matches(id) ON DELETE CASCADE,
+            FOREIGN KEY (segment_id) REFERENCES v2_segments(id) ON DELETE CASCADE,
+            FOREIGN KEY (channel_id) REFERENCES v2_channels(id) ON DELETE CASCADE,
+            FOREIGN KEY (media_id) REFERENCES v2_media(id) ON DELETE CASCADE
+        );
+    ''')
     
+    # Migration checks for existing databases
+    cursor.execute("PRAGMA table_info(v2_media);")
+    media_cols = [row['name'] for row in cursor.fetchall()]
+    if 'status' not in media_cols:
+        cursor.execute("ALTER TABLE v2_media ADD COLUMN status TEXT DEFAULT 'raw';")
+
     # Check if 'is_admin' column exists in 'users' table (migration for existing database files)
     cursor.execute("PRAGMA table_info(users);")
     columns = [row['name'] for row in cursor.fetchall()]
@@ -84,8 +155,8 @@ def init_db():
         
     # Check if 'type' column exists in 'projects' table (migration for existing database files)
     cursor.execute("PRAGMA table_info(projects);")
-    columns = [row['name'] for row in cursor.fetchall()]
-    if 'type' not in columns:
+    proj_cols = [row['name'] for row in cursor.fetchall()]
+    if 'type' not in proj_cols:
         cursor.execute("ALTER TABLE projects ADD COLUMN type TEXT NOT NULL DEFAULT 'alignment';")
     
     conn.commit()
@@ -236,6 +307,41 @@ def create_project(name, description, project_type, user_id):
     project_id = cursor.lastrowid
     conn.close()
     return project_id
+
+def initialize_project_channels(project_id, project_type):
+    """Initializes default channels for a project based on its project_type."""
+    if not project_type or project_type == 'empty':
+        return
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if project_type == 'audio_transcript':
+        cursor.execute(
+            "INSERT INTO v2_channels (project_id, json_channel_id, name, type, channel_order) VALUES (?, ?, ?, ?, ?)",
+            (project_id, 1, "Audio", "audio", 0)
+        )
+        cursor.execute(
+            "INSERT INTO v2_channels (project_id, json_channel_id, name, type, channel_order) VALUES (?, ?, ?, ?, ?)",
+            (project_id, 2, "Transcripción", "transcript", 1)
+        )
+    elif project_type == 'audio_transcript_translation':
+        cursor.execute(
+            "INSERT INTO v2_channels (project_id, json_channel_id, name, type, channel_order) VALUES (?, ?, ?, ?, ?)",
+            (project_id, 1, "Audio", "audio", 0)
+        )
+        cursor.execute(
+            "INSERT INTO v2_channels (project_id, json_channel_id, name, type, channel_order) VALUES (?, ?, ?, ?, ?)",
+            (project_id, 2, "Transcripción", "transcript", 1)
+        )
+        cursor.execute(
+            "INSERT INTO v2_channels (project_id, json_channel_id, name, type, channel_order) VALUES (?, ?, ?, ?, ?)",
+            (project_id, 3, "Traducción", "translation", 2)
+        )
+
+    conn.commit()
+    conn.close()
+
 
 def list_projects(user_id):
     conn = get_db_connection()
@@ -534,3 +640,484 @@ def search_users_for_autocomplete(query, exclude_user_id):
     rows = cursor.fetchall()
     conn.close()
     return [row['username'] for row in rows]
+
+# --- Module V2 Relational CRUD & Utilities ---
+
+def parse_time_string(val):
+    if val is None:
+        return 0.0
+    if isinstance(val, (int, float)):
+        return float(val)
+    val_str = str(val).strip()
+    parts = val_str.split(':')
+    try:
+        if len(parts) == 3:
+            h, m, s = map(float, parts)
+            return h * 3600 + m * 60 + s
+        elif len(parts) == 2:
+            m, s = map(float, parts)
+            return m * 60 + s
+        else:
+            return float(val_str)
+    except ValueError:
+        return 0.0
+
+def format_seconds_to_time_str(seconds):
+    if seconds is None:
+        return "0:00:00"
+    secs = float(seconds)
+    hours = int(secs // 3600)
+    minutes = int((secs % 3600) // 60)
+    rem_secs = secs % 60
+    if rem_secs.is_integer():
+        return f"{hours}:{minutes:02d}:{int(rem_secs):02d}"
+    else:
+        return f"{hours}:{minutes:02d}:{rem_secs:05.2f}"
+
+def import_v2_project_from_json(project_id, json_data):
+    """Imports a project JSON payload (matching proj_desc.txt) into relational V2 tables."""
+    if isinstance(json_data, str):
+        import json
+        json_data = json.loads(json_data)
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Clear existing V2 data for this project
+        cursor.execute("DELETE FROM v2_matches WHERE project_id = ?", (project_id,))
+        cursor.execute("DELETE FROM v2_channels WHERE project_id = ?", (project_id,))
+
+        channel_map = {}
+        media_map = {}
+        segment_map = {}
+
+        for ch_idx, ch in enumerate(json_data.get("channels", [])):
+            json_ch_id = ch.get("channel_id")
+            cursor.execute(
+                "INSERT INTO v2_channels (project_id, json_channel_id, name, type, channel_order) VALUES (?, ?, ?, ?, ?)",
+                (project_id, json_ch_id, ch["name"], ch["type"], ch_idx)
+            )
+            db_ch_id = cursor.lastrowid
+            channel_map[json_ch_id] = db_ch_id
+
+            for med in ch.get("media", []):
+                json_med_id = med.get("media_id")
+                key_med = (json_ch_id, json_med_id)
+                cursor.execute(
+                    "INSERT INTO v2_media (channel_id, json_media_id, filename, media_type) VALUES (?, ?, ?, ?)",
+                    (db_ch_id, json_med_id, med.get("filename", ""), med.get("type", ""))
+                )
+                db_med_id = cursor.lastrowid
+                media_map[key_med] = db_med_id
+
+                for seg_idx, seg in enumerate(med.get("segments", [])):
+                    json_seg_id = seg.get("segment_id")
+                    start_sec = parse_time_string(seg.get("start")) if "start" in seg else None
+                    end_sec = parse_time_string(seg.get("end")) if "end" in seg else None
+                    text_val = seg.get("text")
+
+                    cursor.execute(
+                        "INSERT INTO v2_segments (channel_id, media_id, json_segment_id, start_time, end_time, text_content, segment_order) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (db_ch_id, db_med_id, json_seg_id, start_sec, end_sec, text_val, seg_idx)
+                    )
+                    db_seg_id = cursor.lastrowid
+                    segment_map[json_seg_id] = db_seg_id
+
+        for match_group in json_data.get("matches", []):
+            cursor.execute("INSERT INTO v2_matches (project_id) VALUES (?)", (project_id,))
+            db_match_id = cursor.lastrowid
+
+            for item in match_group:
+                json_ch_id = item["channel"]
+                json_med_id = item["media"]
+                json_seg_id = item["segment"]
+
+                ch_id = channel_map.get(json_ch_id)
+                med_id = media_map.get((json_ch_id, json_med_id))
+                seg_id = segment_map.get(json_seg_id)
+
+                if ch_id and med_id and seg_id:
+                    cursor.execute(
+                        "INSERT INTO v2_match_segments (match_id, segment_id, channel_id, media_id) VALUES (?, ?, ?, ?)",
+                        (db_match_id, seg_id, ch_id, med_id)
+                    )
+
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def export_v2_project_to_json(project_id):
+    """Exports relational V2 project tables back into a proj_desc.txt formatted dict."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM v2_channels WHERE project_id = ? ORDER BY channel_order ASC", (project_id,))
+    channels = [dict(r) for r in cursor.fetchall()]
+
+    exported_channels = []
+    for ch in channels:
+        ch_dict = {
+            "type": ch["type"],
+            "name": ch["name"],
+            "channel_id": ch["json_channel_id"] or ch["id"],
+            "media": []
+        }
+
+        cursor.execute("SELECT * FROM v2_media WHERE channel_id = ?", (ch["id"],))
+        media_list = [dict(m) for m in cursor.fetchall()]
+
+        for med in media_list:
+            med_dict = {
+                "filename": med["filename"],
+                "media_id": med["json_media_id"] or med["id"],
+                "segments": []
+            }
+            if med["media_type"]:
+                med_dict["type"] = med["media_type"]
+
+            cursor.execute("SELECT * FROM v2_segments WHERE media_id = ? ORDER BY segment_order ASC", (med["id"],))
+            segments = [dict(s) for s in cursor.fetchall()]
+
+            for seg in segments:
+                seg_dict = {
+                    "segment_id": seg["json_segment_id"] or seg["id"]
+                }
+                if seg["start_time"] is not None and seg["end_time"] is not None:
+                    seg_dict["start"] = format_seconds_to_time_str(seg["start_time"])
+                    seg_dict["end"] = format_seconds_to_time_str(seg["end_time"])
+                if seg["text_content"] is not None:
+                    seg_dict["text"] = seg["text_content"]
+
+                med_dict["segments"].append(seg_dict)
+
+            ch_dict["media"].append(med_dict)
+        exported_channels.append(ch_dict)
+
+    cursor.execute("SELECT * FROM v2_matches WHERE project_id = ?", (project_id,))
+    matches = [dict(m) for m in cursor.fetchall()]
+
+    exported_matches = []
+    for m in matches:
+        cursor.execute("""
+            SELECT ms.*, c.json_channel_id, c.id as ch_db_id, med.json_media_id, med.id as med_db_id, seg.json_segment_id, seg.id as seg_db_id
+            FROM v2_match_segments ms
+            JOIN v2_channels c ON ms.channel_id = c.id
+            JOIN v2_media med ON ms.media_id = med.id
+            JOIN v2_segments seg ON ms.segment_id = seg.id
+            WHERE ms.match_id = ?
+        """, (m["id"],))
+        items = [dict(r) for r in cursor.fetchall()]
+
+        match_group = []
+        for item in items:
+            match_group.append({
+                "channel": item["json_channel_id"] or item["ch_db_id"],
+                "media": item["json_media_id"] or item["med_db_id"],
+                "segment": item["json_segment_id"] or item["seg_db_id"]
+            })
+        exported_matches.append(match_group)
+
+    conn.close()
+
+    return {
+        "project": {
+            "channels": exported_channels,
+            "matches": exported_matches
+        }
+    }
+
+def get_v2_project_full(project_id):
+    """Returns structured V2 project data with all channels, media, segments, and match mappings."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM projects WHERE id = ?", (project_id,))
+    project_row = cursor.fetchone()
+    if not project_row:
+        conn.close()
+        return None
+
+    project = dict(project_row)
+
+    cursor.execute("SELECT * FROM v2_channels WHERE project_id = ? ORDER BY channel_order ASC", (project_id,))
+    channels = [dict(r) for r in cursor.fetchall()]
+
+    for ch in channels:
+        cursor.execute("SELECT * FROM v2_media WHERE channel_id = ?", (ch["id"],))
+        media_list = [dict(m) for m in cursor.fetchall()]
+        for med in media_list:
+            cursor.execute("SELECT * FROM v2_segments WHERE media_id = ? ORDER BY segment_order ASC", (med["id"],))
+            med["segments"] = [dict(s) for s in cursor.fetchall()]
+        ch["media"] = media_list
+
+    cursor.execute("SELECT * FROM v2_matches WHERE project_id = ?", (project_id,))
+    matches = [dict(m) for m in cursor.fetchall()]
+
+    for m in matches:
+        cursor.execute("""
+            SELECT ms.*, c.name as channel_name, c.type as channel_type, s.start_time, s.end_time, s.text_content
+            FROM v2_match_segments ms
+            JOIN v2_channels c ON ms.channel_id = c.id
+            JOIN v2_segments s ON ms.segment_id = s.id
+            WHERE ms.match_id = ?
+        """, (m["id"],))
+        m["items"] = [dict(r) for r in cursor.fetchall()]
+
+    conn.close()
+
+    project["channels"] = channels
+    project["matches"] = matches
+    return project
+
+def create_v2_match(project_id, segment_ids):
+    """Creates a new match linking multiple segment_ids together."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO v2_matches (project_id) VALUES (?)", (project_id,))
+        match_id = cursor.lastrowid
+
+        for seg_id in segment_ids:
+            cursor.execute("SELECT channel_id, media_id FROM v2_segments WHERE id = ?", (seg_id,))
+            seg = cursor.fetchone()
+            if seg:
+                cursor.execute(
+                    "INSERT INTO v2_match_segments (match_id, segment_id, channel_id, media_id) VALUES (?, ?, ?, ?)",
+                    (match_id, seg_id, seg["channel_id"], seg["media_id"])
+                )
+
+        conn.commit()
+        return match_id
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def delete_v2_match(match_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM v2_matches WHERE id = ?", (match_id,))
+    conn.commit()
+    conn.close()
+
+def update_v2_segment_bounds(segment_id, start_time, end_time):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE v2_segments SET start_time = ?, end_time = ? WHERE id = ?",
+        (start_time, end_time, segment_id)
+    )
+    conn.commit()
+    conn.close()
+
+def update_v2_segment_text(segment_id, text_content):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE v2_segments SET text_content = ? WHERE id = ?",
+        (text_content, segment_id)
+    )
+    conn.commit()
+    conn.close()
+
+def list_v2_user_projects(user_id):
+    """Returns separate lists for owned V2 projects and shared V2 projects."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT p.*, 'owner' as user_role 
+        FROM projects p 
+        WHERE p.user_id = ? AND p.type = 'multichannel_v2'
+        ORDER BY created_at DESC
+    ''', (user_id,))
+    owned = [dict(p) for p in cursor.fetchall()]
+    
+    cursor.execute('''
+        SELECT p.*, pc.role as user_role, u.username as owner_name
+        FROM projects p 
+        JOIN project_collaborators pc ON p.id = pc.project_id 
+        JOIN users u ON p.user_id = u.id
+        WHERE pc.user_id = ? AND p.type = 'multichannel_v2'
+        ORDER BY created_at DESC
+    ''', (user_id,))
+    shared = [dict(p) for p in cursor.fetchall()]
+    
+    conn.close()
+    return {
+        'owned': owned,
+        'shared': shared
+    }
+
+def update_v2_channel(channel_id, name, channel_type):
+    """Updates a channel's name and type."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE v2_channels SET name = ?, type = ? WHERE id = ?",
+        (name, channel_type, channel_id)
+    )
+    conn.commit()
+    conn.close()
+
+def add_v2_channel(project_id, name, channel_type):
+    """Adds a new channel to a project."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT MAX(channel_order) FROM v2_channels WHERE project_id = ?", (project_id,))
+    row = cursor.fetchone()
+    max_order = row[0] if row and row[0] is not None else -1
+    next_order = max_order + 1
+    cursor.execute(
+        "INSERT INTO v2_channels (project_id, name, type, channel_order) VALUES (?, ?, ?, ?)",
+        (project_id, name, channel_type, next_order)
+    )
+    conn.commit()
+    channel_id = cursor.lastrowid
+    conn.close()
+    return channel_id
+
+def delete_v2_channel(channel_id):
+    """Deletes a channel by id."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM v2_channels WHERE id = ?", (channel_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+def add_v2_media(channel_id, filename, media_type="audio"):
+    """Adds a new media file / slot record to a channel."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO v2_media (channel_id, filename, media_type) VALUES (?, ?, ?)",
+        (channel_id, filename, media_type)
+    )
+    conn.commit()
+    media_id = cursor.lastrowid
+    conn.close()
+    return media_id
+
+def save_v2_media_segments(media_id, channel_id, segments):
+    """Saves segment records for a v2_media item and updates its status to 'segmented'."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("DELETE FROM v2_segments WHERE media_id = ?", (media_id,))
+    
+    for idx, seg in enumerate(segments):
+        start_time = float(seg.get('start', 0))
+        end_time = float(seg.get('end', 0))
+        text_val = seg.get('text', '')
+        json_seg_id = seg.get('json_segment_id', idx + 1)
+        
+        cursor.execute(
+            """INSERT INTO v2_segments 
+               (channel_id, media_id, json_segment_id, start_time, end_time, text_content, segment_order) 
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (channel_id, media_id, json_seg_id, start_time, end_time, text_val, idx)
+        )
+        
+    cursor.execute("UPDATE v2_media SET status = 'segmented' WHERE id = ?", (media_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+def import_tabular_csv_media(project_id, filename, csv_content, column_mappings, delimiter=','):
+    """
+    Imports tabular CSV data:
+    1. column_mappings: dict of { str(col_index): int(channel_id) }
+    2. Parses CSV content into rows.
+    3. Row 0 is column headers.
+    4. Rows 1..N: creates media item & text segments for each assigned channel.
+    5. Automatically creates v2_matches linking row i across all assigned channels.
+    """
+    import csv
+    from io import StringIO
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        f = StringIO(csv_content)
+        reader = csv.reader(f, delimiter=delimiter)
+        all_rows = [row for row in reader if any(cell.strip() for cell in row)]
+
+        if len(all_rows) < 1:
+            conn.close()
+            return {'error': 'Empty CSV file'}
+
+        header = all_rows[0]
+        data_rows = all_rows[1:]
+
+        chan_col_map = {}
+        for col_idx_str, ch_id_val in column_mappings.items():
+            if ch_id_val:
+                chan_col_map[int(ch_id_val)] = int(col_idx_str)
+
+        if not chan_col_map:
+            conn.close()
+            return {'error': 'No channels mapped'}
+
+        chan_media_map = {}
+        for ch_id in chan_col_map.keys():
+            cursor.execute(
+                "INSERT INTO v2_media (channel_id, filename, media_type, status) VALUES (?, ?, ?, ?)",
+                (ch_id, filename, 'csv', 'segmented')
+            )
+            chan_media_map[ch_id] = cursor.lastrowid
+
+        created_matches_count = 0
+        total_segments_count = 0
+
+        for row_idx, row in enumerate(data_rows):
+            row_seg_ids = []
+            for ch_id, col_idx in chan_col_map.items():
+                cell_value = row[col_idx].strip() if col_idx < len(row) else ''
+                media_id = chan_media_map[ch_id]
+                json_seg_id = row_idx + 1
+
+                cursor.execute(
+                    """INSERT INTO v2_segments 
+                       (channel_id, media_id, json_segment_id, start_time, end_time, text_content, segment_order) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (ch_id, media_id, json_seg_id, None, None, cell_value, row_idx)
+                )
+                seg_id = cursor.lastrowid
+                row_seg_ids.append((ch_id, media_id, seg_id))
+                total_segments_count += 1
+
+            if len(row_seg_ids) >= 2:
+                cursor.execute("INSERT INTO v2_matches (project_id) VALUES (?)", (project_id,))
+                match_id = cursor.lastrowid
+                for ch_id, media_id, seg_id in row_seg_ids:
+                    cursor.execute(
+                        "INSERT INTO v2_match_segments (match_id, segment_id, channel_id, media_id) VALUES (?, ?, ?, ?)",
+                        (match_id, seg_id, ch_id, media_id)
+                    )
+                created_matches_count += 1
+
+        conn.commit()
+        return {
+            'channels_count': len(chan_media_map),
+            'segments_count': total_segments_count,
+            'matches_count': created_matches_count
+        }
+
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+
+
+

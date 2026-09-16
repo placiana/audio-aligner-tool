@@ -1,0 +1,243 @@
+{% extends 'v2/base_v2.html' %}
+
+{% block title %}Dashboard - Financial Times Editorial Edition{% endblock %}
+
+{% block content %}
+<!-- Top Action Bar -->
+<div class="ft-card" style="display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; background: white;">
+    <div>
+        <h2 style="font-family: var(--font-serif); font-size: 24px; margin: 0; color: var(--ft-ink);">Proyectos Multicanal</h2>
+        <div style="font-size: 13px; color: var(--ft-ink-muted); margin-top: 4px;">
+            Gestión relacional de audio, transcripción, traducción y alineación multicanal.
+        </div>
+    </div>
+    <button id="open-new-project-modal-btn" class="ft-button">
+        ➕ Nuevo Proyecto
+    </button>
+</div>
+
+<!-- Section 1: Owned Projects -->
+<div class="ft-card">
+    <div class="ft-card-header">
+        <h3 class="ft-card-title">Mis Proyectos</h3>
+        <span class="ft-badge claret">{{ owned_projects|length }} Proyectos</span>
+    </div>
+
+    {% if owned_projects %}
+    <div class="ft-project-grid">
+        {% for p in owned_projects %}
+        <div class="ft-project-item">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                    <h4 class="ft-project-name">{{ p.name }}</h4>
+                    <span class="ft-badge teal">Owner</span>
+                </div>
+                <p class="ft-project-desc">
+                    {{ p.description or 'Sin descripción proporcionada.' }}
+                </p>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--ft-border); padding-top: 12px; margin-top: 10px;">
+                <span style="font-size: 11px; color: var(--ft-ink-muted); font-weight: 600;">
+                    Creado: {{ p.created_at[:10] if p.created_at else '' }}
+                </span>
+                <a href="/editor_v2/{{ p.id }}" class="ft-button secondary" style="font-size: 11px; padding: 6px 12px;">
+                    Abrir Editor →
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 40px; color: var(--ft-ink-muted); font-weight: 500;">
+        📭 No tienes proyectos creados. ¡Haz clic en <strong>"Nuevo Proyecto"</strong> para comenzar!
+    </div>
+    {% endif %}
+</div>
+
+<!-- Section 2: Shared Projects -->
+<div class="ft-card">
+    <div class="ft-card-header">
+        <h3 class="ft-card-title">Proyectos Compartidos Conmigo</h3>
+        <span class="ft-badge">{{ shared_projects|length }} Proyectos</span>
+    </div>
+
+    {% if shared_projects %}
+    <div class="ft-project-grid">
+        {% for p in shared_projects %}
+        <div class="ft-project-item" style="border-top-color: var(--ft-teal);">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                    <h4 class="ft-project-name">{{ p.name }}</h4>
+                    <span class="ft-badge" style="background: var(--ft-paper-dark);">Colaborador ({{ p.user_role }})</span>
+                </div>
+                <div style="font-size: 11px; color: var(--ft-claret); font-weight: 700; margin-bottom: 8px;">
+                    Propietario: {{ p.owner_name or 'Otro usuario' }}
+                </div>
+                <p class="ft-project-desc">
+                    {{ p.description or 'Sin descripción proporcionada.' }}
+                </p>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--ft-border); padding-top: 12px; margin-top: 10px;">
+                <span style="font-size: 11px; color: var(--ft-ink-muted); font-weight: 600;">
+                    Creado: {{ p.created_at[:10] if p.created_at else '' }}
+                </span>
+                <a href="/editor_v2/{{ p.id }}" class="ft-button secondary" style="font-size: 11px; padding: 6px 12px;">
+                    Abrir Editor →
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 30px; color: var(--ft-ink-muted); font-weight: 500;">
+        📁 No hay proyectos compartidos contigo por otros usuarios.
+    </div>
+    {% endif %}
+</div>
+
+<!-- 2-Step Modal: New Project -->
+<div id="new-v2-project-modal" class="ft-modal" style="display: none;">
+    <div class="ft-modal-content" style="max-width: 620px;">
+        <div class="ft-modal-header">
+            <h2 id="modal-step-title">Nuevo Proyecto - Tipo</h2>
+            <button id="close-modal-btn" class="ft-button secondary" style="padding: 4px 8px; font-size: 12px;" type="button">✕</button>
+        </div>
+
+        <form method="post" action="/v2/project/create" id="new-project-form">
+            <input type="hidden" name="project_type" id="selected-project-type" value="empty">
+
+            <!-- STEP 1: Select Project Type -->
+            <div id="modal-step-1" class="modal-step">
+                <div style="font-size: 13px; color: var(--ft-ink-muted); margin-bottom: 16px;">
+                    Paso 1 de 2: Seleccione la estructura inicial de canales para su proyecto.
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <!-- Option 1: Empty -->
+                    <div class="project-type-card selected" data-type="empty">
+                        <div class="pt-icon">📁</div>
+                        <div class="pt-info">
+                            <div class="pt-title">Vacío (Empty Project)</div>
+                            <div class="pt-desc">Comienza sin canales predefinidos. Podrás estructurar o importar canales más adelante.</div>
+                        </div>
+                    </div>
+
+                    <!-- Option 2: Audio + Transcripción -->
+                    <div class="project-type-card" data-type="audio_transcript">
+                        <div class="pt-icon">🎧</div>
+                        <div class="pt-info">
+                            <div class="pt-title">Audio + Transcripción</div>
+                            <div class="pt-desc">Inicializa 2 canales: un canal de Audio Original y un canal de Transcripción de texto.</div>
+                        </div>
+                    </div>
+
+                    <!-- Option 3: Audio + Transcripción + Traducción -->
+                    <div class="project-type-card" data-type="audio_transcript_translation">
+                        <div class="pt-icon">🌐</div>
+                        <div class="pt-info">
+                            <div class="pt-title">Audio + Transcripción + Traducción</div>
+                            <div class="pt-desc">Inicializa 3 canales: Audio Original, Transcripción y un canal de Traducción de texto.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 24px;">
+                    <button type="button" id="btn-to-step-2" class="ft-button">
+                        Siguiente →
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 2: Name & Description -->
+            <div id="modal-step-2" class="modal-step" style="display: none;">
+                <div style="font-size: 13px; color: var(--ft-ink-muted); margin-bottom: 16px;">
+                    Paso 2 de 2: Ingrese el nombre y la descripción del proyecto.
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label for="v2-name" style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Nombre del Proyecto *</label>
+                        <input type="text" id="v2-name" name="name" class="ft-input" placeholder="ej. Grabación Biblia Toba - Capítulo 1">
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label for="v2-description" style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Descripción</label>
+                        <textarea id="v2-description" name="description" class="ft-input" style="height: 90px; resize: vertical;" placeholder="ej. Alineación y traducción de múltiples canales de audio y texto"></textarea>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px;">
+                    <button type="button" id="btn-back-to-step-1" class="ft-button secondary">
+                        ← Atrás
+                    </button>
+                    <button type="submit" class="ft-button">
+                        ➕ Crear Proyecto
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const modal = document.getElementById('new-v2-project-modal');
+        const openBtn = document.getElementById('open-new-project-modal-btn');
+        const closeBtn = document.getElementById('close-modal-btn');
+        const step1 = document.getElementById('modal-step-1');
+        const step2 = document.getElementById('modal-step-2');
+        const btnToStep2 = document.getElementById('btn-to-step-2');
+        const btnBackToStep1 = document.getElementById('btn-back-to-step-1');
+        const modalTitle = document.getElementById('modal-step-title');
+        const projectTypeInput = document.getElementById('selected-project-type');
+        const typeCards = document.querySelectorAll('.project-type-card');
+        const nameInput = document.getElementById('v2-name');
+
+        function openStep1() {
+            step1.style.display = 'block';
+            step2.style.display = 'none';
+            modalTitle.textContent = 'Nuevo Proyecto - Tipo';
+        }
+
+        openBtn?.addEventListener('click', () => {
+            openStep1();
+            modal.style.display = 'flex';
+        });
+
+        closeBtn?.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) modal.style.display = 'none';
+        });
+
+        typeCards.forEach(card => {
+            card.addEventListener('click', () => {
+                typeCards.forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                projectTypeInput.value = card.dataset.type;
+            });
+        });
+
+        btnToStep2?.addEventListener('click', () => {
+            step1.style.display = 'none';
+            step2.style.display = 'block';
+            modalTitle.textContent = 'Nuevo Proyecto - Detalles';
+            nameInput.focus();
+        });
+
+        btnBackToStep1?.addEventListener('click', () => {
+            openStep1();
+        });
+
+        document.getElementById('new-project-form')?.addEventListener('submit', (e) => {
+            if (!nameInput.value.trim()) {
+                e.preventDefault();
+                alert('Por favor ingrese el nombre del proyecto.');
+                nameInput.focus();
+            }
+        });
+    });
+</script>
+{% endblock %}

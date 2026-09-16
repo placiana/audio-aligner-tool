@@ -125,10 +125,18 @@
                 <div style="display: flex; flex-direction: column; gap: 6px;">
                     <label for="type" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="project_type_label">Project Type</label>
                     <select id="type" name="type" class="brutalist-input" style="background: white; cursor: pointer; font-family: inherit;">
-                        <option value="alignment" data-i18n="type_alignment">Segmentation & Alignment (Audio + Text)</option>
-                        <option value="transcription" data-i18n="type_transcription">Segmentation & Transcription (Audio)</option>
-                        <option value="segmentation" data-i18n="type_segmentation">Segmentation Only (Audio)</option>
+                        <option value="alignment" data-i18n="type_alignment">Alineación (Audio + Transcripción)</option>
+                        <option value="multichannel_v2" data-i18n="type_multichannel_v2">Multicanal (Audio + Transcripción + Traducción + Relacional)</option>
+                        <option value="multimodal" data-i18n="type_multimodal">Multimodal (Audio + Transcripción + Traducción/es)</option>
+                        <option value="text_translation" data-i18n="type_text_translation">Traducción por Segmentos (Texto + Traducción, Sin Audio)</option>
+                        <option value="transcription" data-i18n="type_transcription">Transcripción (Solo Audio)</option>
+                        <option value="segmentation" data-i18n="type_segmentation">Segmentación (Solo Audio)</option>
                     </select>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label for="translation_langs" style="font-weight: 800; font-size: 12px; text-transform: uppercase;">Idiomas de Traducción (Separados por coma, ej: ES, EN)</label>
+                    <input type="text" id="translation_langs" name="translation_langs" class="brutalist-input" placeholder="e.g. ES, EN" style="background: white;">
                 </div>
                 
                 <div style="display: flex; flex-direction: column; gap: 6px;">

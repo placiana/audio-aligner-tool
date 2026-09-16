@@ -2,11 +2,15 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 import os
 
-def export_elan_xml(audio_name, segments):
+def export_elan_xml(audio_name, segments, text_tracks=None):
     """
     Generates a valid ELAN (.eaf) XML document string for the given segments.
-    segments: list of dicts with keys: 'start', 'end', 'text'
+    segments: list of dicts with keys: 'start', 'end', 'text' or 'texts'
+    text_tracks: optional list of dicts with keys: 'id', 'label'
     """
+    if not text_tracks:
+        text_tracks = [{"id": "src", "label": "Transcription"}]
+
     # Root element
     root = ET.Element("ANNOTATION_DOCUMENT", {
         "AUTHOR": "Audio Aligner Tool",
@@ -35,16 +39,17 @@ def export_elan_xml(audio_name, segments):
     
     # Generate timeslots
     time_slots = []
-    # To keep timeslot IDs unique and ordered
     ts_counter = 1
     
-    # Each segment has a start and end time. We want to list all of them in order.
-    # To make it simple, we create two timeslots per segment.
-    # ELAN expects timestamps in integer milliseconds.
-    
     for i, seg in enumerate(segments):
-        start_ms = int(float(seg['start']) * 1000)
-        end_ms = int(float(seg['end']) * 1000)
+        start_val = seg.get('start', 0.0)
+        end_val = seg.get('end', 0.0)
+        if isinstance(seg.get('audio'), dict):
+            start_val = seg['audio'].get('start', start_val)
+            end_val = seg['audio'].get('end', end_val)
+            
+        start_ms = int(float(start_val) * 1000)
+        end_ms = int(float(end_val) * 1000)
         
         ts_start_id = f"ts{ts_counter}"
         ts_counter += 1
@@ -61,27 +66,38 @@ def export_elan_xml(audio_name, segments):
         })
         
         time_slots.append((ts_start_id, ts_end_id))
+
+    ann_id_counter = 1
+    for track in text_tracks:
+        track_id = track.get('id', 'src')
+        track_label = track.get('label', track_id)
         
-    # Tier element
-    tier = ET.SubElement(root, "TIER", {
-        "LINGUISTIC_TYPE_REF": "default-lt",
-        "TIER_ID": "Transcription"
-    })
-    
-    # Add annotations
-    for i, seg in enumerate(segments):
-        ts_start_id, ts_end_id = time_slots[i]
-        text = seg.get('text', '').strip()
-        
-        ann = ET.SubElement(tier, "ANNOTATION")
-        align_ann = ET.SubElement(ann, "ALIGNABLE_ANNOTATION", {
-            "ANNOTATION_ID": f"a{i+1}",
-            "TIME_SLOT_REF1": ts_start_id,
-            "TIME_SLOT_REF2": ts_end_id
+        tier = ET.SubElement(root, "TIER", {
+            "LINGUISTIC_TYPE_REF": "default-lt",
+            "TIER_ID": track_label
         })
-        ann_val = ET.SubElement(align_ann, "ANNOTATION_VALUE")
-        ann_val.text = text
         
+        for i, seg in enumerate(segments):
+            ts_start_id, ts_end_id = time_slots[i]
+            
+            # Extract text for this track
+            if 'texts' in seg and isinstance(seg['texts'], dict):
+                text_val = seg['texts'].get(track_id, '')
+            else:
+                text_val = seg.get('text', '') if track_id == 'src' else ''
+                
+            text = (text_val or '').strip()
+            
+            ann = ET.SubElement(tier, "ANNOTATION")
+            align_ann = ET.SubElement(ann, "ALIGNABLE_ANNOTATION", {
+                "ANNOTATION_ID": f"a{ann_id_counter}",
+                "TIME_SLOT_REF1": ts_start_id,
+                "TIME_SLOT_REF2": ts_end_id
+            })
+            ann_id_counter += 1
+            ann_val = ET.SubElement(align_ann, "ANNOTATION_VALUE")
+            ann_val.text = text
+            
     # Linguistic type descriptor
     ET.SubElement(root, "LINGUISTIC_TYPE", {
         "GRAPHIC_REFERENCES": "false",
@@ -104,7 +120,6 @@ def export_elan_xml(audio_name, segments):
         
     # Generate pretty-printed XML string
     rough_string = ET.tostring(root, 'utf-8')
-    # Use mini dom or simple string conversions for nice output format
     import xml.dom.minidom
     reparsed = xml.dom.minidom.parseString(rough_string)
     return reparsed.toprettyxml(indent="    ")

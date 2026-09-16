@@ -1,5 +1,5 @@
 let wsFull, wsSegment;
-let regions;
+let regions, regionsSegment;
 let currentState = initialState || {
     audio_path: config ? config.audio_path : '',
     text_path: config ? config.text_path : '',
@@ -60,17 +60,83 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+function hasAudio() {
+    if (currentState && currentState.schema && typeof currentState.schema.has_audio === 'boolean') {
+        return currentState.schema.has_audio;
+    }
+    if (config && config.project_type === 'text_translation') {
+        return false;
+    }
+    return Boolean(currentState && currentState.audio_path);
+}
+
+function getSegStart(seg) {
+    if (!seg) return 0;
+    if (seg.audio && typeof seg.audio.start === 'number') return seg.audio.start;
+    return typeof seg.start === 'number' ? seg.start : 0;
+}
+
+function getSegEnd(seg) {
+    if (!seg) return 0;
+    if (seg.audio && typeof seg.audio.end === 'number') return seg.audio.end;
+    return typeof seg.end === 'number' ? seg.end : 0;
+}
+
 function initStage() {
     if (!config) return;
     const resetBtn = document.getElementById('reset-seg-btn');
+    const stage1El = document.getElementById('stage1');
+    const stage2El = document.getElementById('stage2');
+    
+    // Check if project has no audio (e.g. text translation)
+    if (!hasAudio()) {
+        if (stage1El) stage1El.style.display = 'none';
+        if (stage2El) stage2El.style.display = 'block';
+        if (resetBtn) resetBtn.style.display = 'none';
+        
+        currentState.stage = 2;
+        
+        // Hide audio controls in Stage 2
+        const waveSeg = document.getElementById('waveform-segment');
+        if (waveSeg) waveSeg.style.display = 'none';
+        const playBtn = document.getElementById('play-segment-btn');
+        if (playBtn) playBtn.style.display = 'none';
+        const speedCtrl = document.querySelector('.speed-controls');
+        if (speedCtrl) speedCtrl.style.display = 'none';
+        const zoomCtrl = document.querySelector('.zoom-container');
+        if (zoomCtrl) zoomCtrl.style.display = 'none';
+        
+        // If segments are empty and text_path is provided, load initial text lines as segments
+        if (currentState.segments.length === 0 && config.text_path) {
+            fetch(`/api/load_text?path=${config.text_path}`)
+                .then(r => r.text())
+                .then(txt => {
+                    const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                    currentState.segments = lines.map((l, idx) => ({
+                        id: `seg_${idx+1}`,
+                        audio: null,
+                        texts: { src: l },
+                        text: l
+                    }));
+                    saveState();
+                    updateSegmentUI();
+                })
+                .catch(err => console.error("Error loading text for text_translation project", err));
+        } else {
+            updateSegmentUI();
+        }
+        updateProgress();
+        return;
+    }
+    
     if (currentState.stage === 1) {
-        document.getElementById('stage1').style.display = 'block';
-        document.getElementById('stage2').style.display = 'none';
+        if (stage1El) stage1El.style.display = 'block';
+        if (stage2El) stage2El.style.display = 'none';
         if (resetBtn) resetBtn.style.display = 'none';
         initWaveformFull();
     } else {
-        document.getElementById('stage1').style.display = 'none';
-        document.getElementById('stage2').style.display = 'block';
+        if (stage1El) stage1El.style.display = 'none';
+        if (stage2El) stage2El.style.display = 'block';
         if (resetBtn) resetBtn.style.display = 'block';
         
         // Dynamic layout adjust based on project type
@@ -97,7 +163,7 @@ function initStage() {
             if (textContainer) textContainer.style.display = 'none';
             if (manualContainer) manualContainer.style.display = 'flex';
         } else {
-            // alignment
+            // alignment / multimodal
             if (rightPanel) rightPanel.style.display = 'block';
             if (leftPanel) {
                 leftPanel.style.flex = '1';
@@ -295,17 +361,25 @@ function splitSegmentAtClick(e, region) {
     saveState();
 }
 
-function createRegionLabel(duration) {
+function createRegionLabel(duration, isActive = false, index = null) {
     const el = document.createElement('div');
     el.className = 'region-label';
-    el.style.background = '#000000';
-    el.style.color = '#ffffff';
-    el.style.border = '2px solid #ffffff';
-    el.style.fontSize = '13px';
+    if (isActive) {
+        el.classList.add('active-region-label');
+    }
+    el.style.background = isActive ? '#fef08a' : '#000000';
+    el.style.color = isActive ? '#1a1a1a' : '#ffffff';
+    el.style.border = '2px solid #1a1a1a';
+    el.style.fontSize = '12px';
     el.style.fontWeight = '900';
-    el.style.padding = '4px 8px';
-    el.style.boxShadow = '2px 2px 0px #000000';
-    el.innerText = `${duration.toFixed(1)}s`;
+    el.style.padding = '3px 6px';
+    el.style.boxShadow = isActive ? '2px 2px 0px #1a1a1a' : '1px 1px 0px #000000';
+    
+    if (isActive && index !== null) {
+        el.innerText = `#${index + 1}: ${duration.toFixed(1)}s`;
+    } else {
+        el.innerText = `${duration.toFixed(1)}s`;
+    }
     return el;
 }
 
@@ -352,26 +426,114 @@ async function detectSegments() {
 
 function initWaveformSegment() {
     if (!config) return;
-    if (wsSegment) wsSegment.destroy();
+    if (wsSegment) {
+        wsSegment.destroy();
+        wsSegment = null;
+    }
     
-    const seg = currentState.segments[currentState.current_idx];
-    const segmentUrl = `/api/get_segment_audio?path=${currentState.audio_path}&start=${seg.start}&end=${seg.end}`;
+    const zoomVal = parseInt(document.getElementById('zoom-slider-stage2')?.value || '50');
 
     wsSegment = WaveSurfer.create({
         container: '#waveform-segment',
         waveColor: '#4F4A85',
         progressColor: '#383351',
-        url: segmentUrl,
-        minPxPerSec: 50
+        url: `/uploads/${currentState.audio_path}`,
+        minPxPerSec: zoomVal
     });
 
-    wsSegment.on('decode', () => {
+    regionsSegment = wsSegment.registerPlugin(WaveSurfer.Regions.create());
+
+    wsSegment.on('ready', () => {
         wsSegment.setPlaybackRate(currentSpeed);
     });
 
-    wsSegment.on('finish', () => {
-        wsSegment.setTime(0);
-        wsSegment.play();
+    wsSegment.on('decode', () => {
+        renderStage2Regions();
+        focusCurrentSegment();
+    });
+
+    wsSegment.on('timeupdate', (currentTime) => {
+        const seg = currentState.segments[currentState.current_idx];
+        if (seg && wsSegment && wsSegment.isPlaying()) {
+            const startVal = getSegStart(seg);
+            const endVal = getSegEnd(seg);
+            if (currentTime >= endVal) {
+                wsSegment.pause();
+                wsSegment.setTime(startVal);
+            }
+        }
+    });
+
+    regionsSegment.on('region-updated', (region) => {
+        if (isUpdatingContiguous) return;
+
+        const idx = currentState.segments.findIndex((s, i) => `seg-stage2-${i}` === region.id);
+        if (idx !== -1) {
+            const oldStart = getSegStart(currentState.segments[idx]);
+            const oldEnd = getSegEnd(currentState.segments[idx]);
+
+            if (currentState.segments[idx].audio) {
+                currentState.segments[idx].audio.start = region.start;
+                currentState.segments[idx].audio.end = region.end;
+            }
+            currentState.segments[idx].start = region.start;
+            currentState.segments[idx].end = region.end;
+
+            const isActive = (idx === currentState.current_idx);
+            const label = region.element.querySelector('.region-label');
+            if (label) {
+                label.innerText = isActive 
+                    ? `#${idx + 1}: ${(region.end - region.start).toFixed(1)}s`
+                    : `${(region.end - region.start).toFixed(1)}s`;
+            }
+
+            if (isActive) {
+                const segDurEl = document.getElementById('segment-duration');
+                if (segDurEl) segDurEl.innerText = (region.end - region.start).toFixed(2);
+            }
+
+            isUpdatingContiguous = true;
+            try {
+                if (region.start !== oldStart && idx > 0) {
+                    const prevRegion = regionsSegment.getRegions().find(r => r.id === `seg-stage2-${idx - 1}`);
+                    if (prevRegion) {
+                        prevRegion.setOptions({ end: region.start });
+                        if (currentState.segments[idx - 1].audio) {
+                            currentState.segments[idx - 1].audio.end = region.start;
+                        }
+                        currentState.segments[idx - 1].end = region.start;
+                        const prevLabel = prevRegion.element.querySelector('.region-label');
+                        if (prevLabel) {
+                            const isPrevActive = (idx - 1 === currentState.current_idx);
+                            prevLabel.innerText = isPrevActive 
+                                ? `#${idx}: ${(prevRegion.end - prevRegion.start).toFixed(1)}s`
+                                : `${(prevRegion.end - prevRegion.start).toFixed(1)}s`;
+                        }
+                    }
+                }
+                if (region.end !== oldEnd && idx < currentState.segments.length - 1) {
+                    const nextRegion = regionsSegment.getRegions().find(r => r.id === `seg-stage2-${idx + 1}`);
+                    if (nextRegion) {
+                        nextRegion.setOptions({ start: region.end });
+                        if (currentState.segments[idx + 1].audio) {
+                            currentState.segments[idx + 1].audio.start = region.end;
+                        }
+                        currentState.segments[idx + 1].start = region.end;
+                        const nextLabel = nextRegion.element.querySelector('.region-label');
+                        if (nextLabel) {
+                            const isNextActive = (idx + 1 === currentState.current_idx);
+                            nextLabel.innerText = isNextActive 
+                                ? `#${idx + 2}: ${(nextRegion.end - nextRegion.start).toFixed(1)}s`
+                                : `${(nextRegion.end - nextRegion.start).toFixed(1)}s`;
+                        }
+                    }
+                }
+            } finally {
+                isUpdatingContiguous = false;
+            }
+
+            saveState();
+        }
     });
 
     wsSegment.on('play', () => {
@@ -383,6 +545,62 @@ function initWaveformSegment() {
         const btn = document.getElementById('play-segment-btn');
         if (btn) btn.innerText = '▶';
     });
+}
+
+function renderStage2Regions() {
+    if (!config || !regionsSegment) return;
+    regionsSegment.clearRegions();
+    const isViewer = (window.userRole === 'viewer');
+
+    currentState.segments.forEach((seg, i) => {
+        const isActive = (i === currentState.current_idx);
+        const startVal = getSegStart(seg);
+        const endVal = getSegEnd(seg);
+
+        const region = regionsSegment.addRegion({
+            id: `seg-stage2-${i}`,
+            start: startVal,
+            end: endVal,
+            color: isActive ? 'rgba(254, 240, 138, 0.65)' : 'rgba(0, 123, 255, 0.2)',
+            drag: !isViewer,
+            resize: !isViewer,
+            content: createRegionLabel(endVal - startVal, isActive, i)
+        });
+
+        if (isActive && region.element) {
+            region.element.classList.add('active-region');
+        }
+
+        if (region.element) {
+            region.element.addEventListener('click', (e) => {
+                if (e.target.classList.contains('wavesurfer-region-handle')) return;
+                if (currentState.current_idx !== i) {
+                    jumpToSegment(i);
+                }
+            });
+        }
+    });
+}
+
+function focusCurrentSegment() {
+    if (!wsSegment || !currentState.segments[currentState.current_idx]) return;
+    const seg = currentState.segments[currentState.current_idx];
+    const startVal = getSegStart(seg);
+    const endVal = getSegEnd(seg);
+
+    wsSegment.setTime(startVal);
+
+    const wrapper = wsSegment.getWrapper();
+    if (wrapper) {
+        const duration = wsSegment.getDuration();
+        if (duration > 0) {
+            const pxPerSec = wrapper.scrollWidth / duration;
+            const startPx = startVal * pxPerSec;
+            const segWidthPx = (endVal - startVal) * pxPerSec;
+            const centerPx = startPx + (segWidthPx / 2);
+            wrapper.scrollLeft = Math.max(0, centerPx - (wrapper.clientWidth / 2));
+        }
+    }
 }
 
 let originalTranscription = "";
@@ -407,25 +625,85 @@ async function loadTranscription() {
     renderTranscription();
 }
 
-function renderTranscription() {
-    const container = document.getElementById('text-container');
+function renderDynamicTextInputs() {
+    const container = document.getElementById('manual-transcription-container');
     if (!container) return;
     
-    // Update active segment indices
-    document.getElementById('current-segment-idx').innerText = currentState.current_idx + 1;
+    const textTracks = (currentState.schema && currentState.schema.text_tracks) ? 
+        currentState.schema.text_tracks : 
+        [{ id: 'src', label: 'Transcription', role: 'source' }];
+        
+    const seg = currentState.segments[currentState.current_idx];
+    if (!seg) return;
+    
+    if (!seg.texts || typeof seg.texts !== 'object') {
+        seg.texts = {};
+        if (seg.text) seg.texts['src'] = seg.text;
+    }
+
+    container.innerHTML = '';
+    
+    textTracks.forEach(track => {
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.style.display = 'flex';
+        fieldWrapper.style.flexDirection = 'column';
+        fieldWrapper.style.gap = '5px';
+        fieldWrapper.style.marginBottom = '10px';
+        
+        const label = document.createElement('label');
+        label.style.fontWeight = '900';
+        label.style.fontSize = '12px';
+        label.style.textTransform = 'uppercase';
+        label.innerText = `${track.label}:`;
+        
+        const textarea = document.createElement('textarea');
+        textarea.className = 'brutalist-input track-textarea';
+        textarea.dataset.trackId = track.id;
+        textarea.style.height = '65px';
+        textarea.style.resize = 'vertical';
+        textarea.style.fontFamily = 'inherit';
+        textarea.style.fontSize = '14px';
+        textarea.placeholder = `Escribir ${track.label.toLowerCase()} aquí...`;
+        
+        textarea.value = seg.texts[track.id] || (track.id === 'src' ? (seg.text || '') : '');
+        
+        if (window.userRole === 'viewer') {
+            textarea.readOnly = true;
+        }
+        
+        textarea.addEventListener('input', () => {
+            seg.texts[track.id] = textarea.value;
+            if (track.id === 'src') seg.text = textarea.value;
+        });
+        
+        fieldWrapper.appendChild(label);
+        fieldWrapper.appendChild(textarea);
+        container.appendChild(fieldWrapper);
+    });
+}
+
+function renderTranscription() {
+    const container = document.getElementById('text-container');
+    
+    const currentIdxEl = document.getElementById('current-segment-idx');
+    const totalSegsEl = document.getElementById('total-segments');
+    if (currentIdxEl) currentIdxEl.innerText = currentState.segments.length > 0 ? currentState.current_idx + 1 : 0;
+    if (totalSegsEl) totalSegsEl.innerText = currentState.segments.length;
+    
     const seg = currentState.segments[currentState.current_idx];
     if (seg) {
-        document.getElementById('segment-duration').innerText = (seg.end - seg.start).toFixed(2);
-        
-        // Load text into manual text entry
-        const manualInput = document.getElementById('manual-transcription-input');
-        if (manualInput) {
-            manualInput.value = seg.text || '';
+        const segDurEl = document.getElementById('segment-duration');
+        if (segDurEl) {
+            const startVal = getSegStart(seg);
+            const endVal = getSegEnd(seg);
+            segDurEl.innerText = (endVal - startVal).toFixed(2);
         }
     }
     
+    renderDynamicTextInputs();
+    
     // If text file was loaded and project type is alignment, render highlights
-    if (config.project_type === 'alignment' && config.text_path && config.text_path !== "" && originalTranscription !== "") {
+    if (container && config.project_type === 'alignment' && config.text_path && config.text_path !== "" && originalTranscription !== "") {
         container.style.display = 'block';
         container.innerHTML = '';
         
@@ -440,18 +718,19 @@ function renderTranscription() {
 
         let lastIdx = 0;
         const ranges = currentState.segments.map((s, i) => {
-            if (!s.text) return null;
-            let found = originalTranscription.indexOf(s.text, lastIdx);
+            const txt = (s.texts && s.texts.src) || s.text;
+            if (!txt) return null;
+            let found = originalTranscription.indexOf(txt, lastIdx);
             if (found === -1) {
-                found = originalTranscription.indexOf(s.text);
+                found = originalTranscription.indexOf(txt);
             }
             if (found !== -1) {
-                lastIdx = found + s.text.length;
+                lastIdx = found + txt.length;
                 return {
                     index: i,
                     start: found,
-                    end: found + s.text.length,
-                    text: s.text
+                    end: found + txt.length,
+                    text: txt
                 };
             }
             return null;
@@ -502,7 +781,7 @@ function renderTranscription() {
                 activeSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }, 100);
-    } else {
+    } else if (container) {
         container.style.display = 'none';
     }
     
@@ -511,20 +790,13 @@ function renderTranscription() {
     if (assignBtn && seg) {
         if (config.project_type === 'segmentation') {
             assignBtn.style.display = 'none';
-        } else if (config.project_type === 'transcription') {
+        } else {
             assignBtn.style.display = 'block';
-            if (seg.text) {
+            const hasAnyText = (seg.texts && Object.values(seg.texts).some(v => v && v.trim())) || Boolean(seg.text);
+            if (hasAnyText) {
                 assignBtn.innerText = translations[currentLang].next_seg_btn;
             } else {
                 assignBtn.innerText = translations[currentLang].save_segment_btn;
-            }
-        } else {
-            // alignment
-            assignBtn.style.display = 'block';
-            if (seg.text) {
-                assignBtn.innerText = translations[currentLang].next_seg_btn;
-            } else {
-                assignBtn.innerText = translations[currentLang].assign_highlight_btn;
             }
         }
     }
@@ -538,10 +810,12 @@ function updateSegmentUI() {
     if (btn) btn.innerText = '▶';
 
     const seg = currentState.segments[currentState.current_idx];
-    if (seg) {
-        const segmentUrl = `/api/get_segment_audio?path=${currentState.audio_path}&start=${seg.start}&end=${seg.end}`;
-        if (wsSegment) {
-            wsSegment.load(segmentUrl);
+    if (seg && hasAudio()) {
+        if (!wsSegment) {
+            initWaveformSegment();
+        } else {
+            renderStage2Regions();
+            focusCurrentSegment();
         }
     }
 }
@@ -549,11 +823,27 @@ function updateSegmentUI() {
 function assignText() {
     if (!config) return;
     
-    const manualInput = document.getElementById('manual-transcription-input');
-    const textVal = manualInput ? manualInput.value.trim() : '';
+    const seg = currentState.segments[currentState.current_idx];
+    if (!seg) return;
     
-    if (textVal !== "") {
-        currentState.segments[currentState.current_idx].text = textVal;
+    if (!seg.texts || typeof seg.texts !== 'object') {
+        seg.texts = {};
+    }
+    
+    const container = document.getElementById('manual-transcription-container');
+    if (container) {
+        const textareas = container.querySelectorAll('.track-textarea');
+        textareas.forEach(ta => {
+            const tId = ta.dataset.trackId;
+            const val = ta.value.trim();
+            seg.texts[tId] = val;
+            if (tId === 'src') seg.text = val;
+        });
+    }
+    
+    const hasAnyText = Object.values(seg.texts).some(v => v !== '') || Boolean(seg.text && seg.text.trim() !== '');
+    
+    if (hasAnyText || config.project_type === 'segmentation') {
         saveState();
         
         if (currentState.current_idx === currentState.segments.length - 1) {
@@ -624,14 +914,26 @@ function adjustSegmentTime(boundary, delta) {
     if (!seg) return;
     
     if (boundary === 'start') {
-        const newStart = Math.max(0, seg.start + delta);
-        if (newStart < seg.end) {
+        const newStart = Math.max(0, getSegStart(seg) + delta);
+        if (newStart < getSegEnd(seg)) {
             seg.start = newStart;
+            if (seg.audio) seg.audio.start = newStart;
+            if (currentState.current_idx > 0) {
+                const prevSeg = currentState.segments[currentState.current_idx - 1];
+                prevSeg.end = newStart;
+                if (prevSeg.audio) prevSeg.audio.end = newStart;
+            }
         }
     } else if (boundary === 'end') {
-        const newEnd = seg.end + delta;
-        if (newEnd > seg.start) {
+        const newEnd = getSegEnd(seg) + delta;
+        if (newEnd > getSegStart(seg)) {
             seg.end = newEnd;
+            if (seg.audio) seg.audio.end = newEnd;
+            if (currentState.current_idx < currentState.segments.length - 1) {
+                const nextSeg = currentState.segments[currentState.current_idx + 1];
+                nextSeg.start = newEnd;
+                if (nextSeg.audio) nextSeg.audio.start = newEnd;
+            }
         }
     }
     
@@ -639,12 +941,11 @@ function adjustSegmentTime(boundary, delta) {
     saveState();
     
     // Update display labels
-    document.getElementById('segment-duration').innerText = (seg.end - seg.start).toFixed(2);
+    document.getElementById('segment-duration').innerText = (getSegEnd(seg) - getSegStart(seg)).toFixed(2);
     
-    // Reload segment waveform with corrected timings
-    const segmentUrl = `/api/get_segment_audio?path=${currentState.audio_path}&start=${seg.start}&end=${seg.end}`;
-    if (wsSegment) {
-        wsSegment.load(segmentUrl);
+    if (wsSegment && regionsSegment) {
+        renderStage2Regions();
+        wsSegment.setTime(getSegStart(seg));
     }
 }
 
@@ -662,8 +963,11 @@ function setupEventListeners() {
 
     document.getElementById('zoom-slider-stage2')?.addEventListener('input', (e) => {
         const zoomVal = parseInt(e.target.value);
+        const zoomText = document.getElementById('zoom-value-stage2');
+        if (zoomText) zoomText.innerText = `${zoomVal} px/s`;
         if (wsSegment) {
             wsSegment.zoom(zoomVal);
+            focusCurrentSegment();
         }
     });
 
@@ -685,7 +989,20 @@ function setupEventListeners() {
 
     document.getElementById('play-segment-btn')?.addEventListener('click', () => {
         if (wsSegment) {
-            wsSegment.playPause();
+            if (wsSegment.isPlaying()) {
+                wsSegment.pause();
+            } else {
+                const seg = currentState.segments[currentState.current_idx];
+                if (seg) {
+                    const startVal = getSegStart(seg);
+                    const endVal = getSegEnd(seg);
+                    const cur = wsSegment.getCurrentTime();
+                    if (cur < startVal || cur >= endVal - 0.05) {
+                        wsSegment.setTime(startVal);
+                    }
+                }
+                wsSegment.play();
+            }
         }
     });
 
@@ -747,7 +1064,20 @@ function setupEventListeners() {
             if (e.code === 'Space' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
                 e.preventDefault();
                 if (wsSegment) {
-                    wsSegment.playPause();
+                    if (wsSegment.isPlaying()) {
+                        wsSegment.pause();
+                    } else {
+                        const seg = currentState.segments[currentState.current_idx];
+                        if (seg) {
+                            const startVal = getSegStart(seg);
+                            const endVal = getSegEnd(seg);
+                            const cur = wsSegment.getCurrentTime();
+                            if (cur < startVal || cur >= endVal - 0.05) {
+                                wsSegment.setTime(startVal);
+                            }
+                        }
+                        wsSegment.play();
+                    }
                 }
             }
             if (e.ctrlKey && e.key === 'Enter') {

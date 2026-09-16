@@ -162,13 +162,13 @@
                     <!-- Local Upload Inputs Section -->
                     <div id="section-source-local" style="display: flex; flex-direction: column; gap: 15px;">
                         <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <label for="audio_file" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="audio_file_label">Audio File (.mp3, .wav)</label>
-                            <input type="file" id="audio_file" name="audio_file" accept=".mp3,.wav" required class="brutalist-input">
+                            <label for="audio_file" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="audio_file_label">Audio File (.mp3, .wav) {% if project.type == 'text_translation' %}- <span style="font-style: italic;">Opcional</span>{% endif %}</label>
+                            <input type="file" id="audio_file" name="audio_file" accept=".mp3,.wav" {% if project.type != 'text_translation' %}required{% endif %} class="brutalist-input">
                         </div>
                         
-                        {% if project.type == 'alignment' %}
+                        {% if project.type in ['alignment', 'multimodal', 'text_translation'] %}
                         <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <label for="text_file" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="text_file_label">Transcription File (.txt) - <span style="font-style: italic; font-weight: 700;">Optional</span></label>
+                            <label for="text_file" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="text_file_label">Archivo de Texto Origen (.txt) - <span style="font-style: italic; font-weight: 700;">{% if project.type == 'text_translation' %}Recomendado{% else %}Opcional{% endif %}</span></label>
                             <input type="file" id="text_file" name="text_file" accept=".txt" class="brutalist-input">
                         </div>
                         {% endif %}
@@ -177,7 +177,7 @@
                     <!-- Repository Selection Inputs Section -->
                     <div id="section-source-repo" style="display: none; flex-direction: column; gap: 15px;">
                         <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="audio_file_label">Audio File (.mp3, .wav)</label>
+                            <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="audio_file_label">Audio File (.mp3, .wav) {% if project.type == 'text_translation' %}- <span style="font-style: italic;">Opcional</span>{% endif %}</label>
                             <button type="button" id="btn-pick-repo-audio" class="brutalist-button secondary-btn" style="width: 100%; font-size: 12px;" data-i18n="select_repo_audio_btn">
                                 📁 Choose Audio from Repository
                             </button>
@@ -186,9 +186,9 @@
                             </div>
                         </div>
 
-                        {% if project.type == 'alignment' %}
+                        {% if project.type in ['alignment', 'multimodal', 'text_translation'] %}
                         <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="text_file_label">Transcription File (.txt) - <span style="font-style: italic; font-weight: 700;">Optional</span></label>
+                            <label style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="text_file_label">Archivo de Texto Origen (.txt) - <span style="font-style: italic; font-weight: 700;">{% if project.type == 'text_translation' %}Recomendado{% else %}Opcional{% endif %}</span></label>
                             <button type="button" id="btn-pick-repo-text" class="brutalist-button secondary-btn" style="width: 100%; font-size: 12px;" data-i18n="select_repo_text_btn">
                                 📁 Choose Text from Repository
                             </button>

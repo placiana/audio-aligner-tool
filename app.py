@@ -12,6 +12,7 @@ import functools
 import database
 import elan_exporter
 import repository
+import v2_repository
 
 
 try:
@@ -105,7 +106,7 @@ def register():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if g.user:
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('v2_dashboard'))
         
     if request.method == 'POST':
         username = request.form.get('username')
@@ -118,7 +119,7 @@ def login():
             
         session.clear()
         session['user_id'] = user['id']
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('v2_dashboard'))
         
     return render_template('login.html')
 
@@ -225,7 +226,7 @@ def google_callback():
         session.clear()
         session['user_id'] = user['id']
         flash('¡Sesión iniciada correctamente con Google!', 'success')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('v2_dashboard'))
         
     except Exception as e:
         flash(f'Error al conectar con Google: {str(e)}', 'error')
@@ -381,12 +382,44 @@ def repository_download():
         return redirect(url_for('repository_view'))
 
 
+def get_project_text_tracks(project):
+    p_type = project['type']
+    tracks = [{"id": "src", "label": "Transcripción (Origen)", "role": "source"}]
+    
+    desc = project.get('description') or ''
+    langs = []
+    if '[Langs:' in desc:
+        try:
+            langs_str = desc.split('[Langs:')[1].split(']')[0].strip()
+            langs = [l.strip().upper() for l in langs_str.split(',') if l.strip()]
+        except Exception:
+            pass
+            
+    if not langs and p_type in ('multimodal', 'text_translation'):
+        langs = ['ES']
+        
+    for lang in langs:
+        lang_id = f"trans_{lang.lower()}"
+        tracks.append({
+            "id": lang_id,
+            "label": f"Traducción ({lang})",
+            "role": "translation",
+            "lang": lang.lower()
+        })
+        
+    return tracks
+
 @app.route('/project/create', methods=['POST'])
 @login_required
 def create_project():
     name = request.form.get('name')
-    description = request.form.get('description')
+    description = request.form.get('description', '')
     project_type = request.form.get('type', 'alignment')
+    translation_langs = request.form.get('translation_langs', '').strip()
+    
+    if translation_langs:
+        description = f"{description} [Langs: {translation_langs}]".strip()
+        
     if name:
         database.create_project(name, description, project_type, g.user['id'])
         flash('Project created successfully!', 'success')
@@ -401,6 +434,9 @@ def project_detail(project_id):
     if not project:
         flash('Project not found.', 'error')
         return redirect(url_for('dashboard'))
+    
+    if project.get('type') == 'multichannel_v2':
+        return redirect(url_for('editor_v2', project_id=project_id))
     
     items = database.list_audio_items(project_id)
     items_with_progress = []
@@ -418,7 +454,7 @@ def project_detail(project_id):
             completed = total if stage == 2 else 0
             progress = 100 if stage == 2 else 0
         else:
-            completed = len([s for s in segments if s.get('text')])
+            completed = len([s for s in segments if s.get('text') or (s.get('texts') and any(s.get('texts').values()))])
             progress = round((completed / total * 100)) if total > 0 else 0
         
         items_with_progress.append({
@@ -452,14 +488,17 @@ def upload_track(project_id):
         flash('Acceso denegado: El rol de solo lectura no permite subir pistas.', 'error')
         return redirect(url_for('project_detail', project_id=project_id))
     
+    p_type = project['type']
+    is_text_only = (p_type == 'text_translation')
+    
     audio_file = request.files.get('audio_file')
     text_file = request.files.get('text_file')
     repo_audio_path = request.form.get('repo_audio_path', '').strip()
     repo_text_path = request.form.get('repo_text_path', '').strip()
     
     has_audio_file = audio_file and audio_file.filename != ''
-    if not has_audio_file and not repo_audio_path:
-        flash('Audio file is required.', 'error')
+    if not is_text_only and not has_audio_file and not repo_audio_path:
+        flash('Audio file is required for this project type.', 'error')
         return redirect(url_for('project_detail', project_id=project_id))
         
     # Set up directory layout inside uploads/
@@ -476,21 +515,21 @@ def upload_track(project_id):
     )
     os.makedirs(sys_uploads_dir, exist_ok=True)
 
-    # 1. Save / Copy Audio File
+    # 1. Save / Copy Audio File (if present or required)
+    audio_db_path = ""
+    audio_filename = ""
     if repo_audio_path:
         try:
             source_audio_path, _ = repository.safe_join_user_repo(app.config['UPLOAD_FOLDER'], g.user['id'], repo_audio_path)
-            if not os.path.exists(source_audio_path) or os.path.isdir(source_audio_path):
-                flash('El archivo de audio seleccionado del repositorio no existe.', 'error')
-                return redirect(url_for('project_detail', project_id=project_id))
-            audio_filename = secure_filename(os.path.basename(source_audio_path))
-            audio_local_path = os.path.join(audio_dir, audio_filename)
-            shutil.copy(source_audio_path, audio_local_path)
-            audio_db_path = f"projects/{project_id}/audio/{audio_filename}"
+            if os.path.exists(source_audio_path) and not os.path.isdir(source_audio_path):
+                audio_filename = secure_filename(os.path.basename(source_audio_path))
+                audio_local_path = os.path.join(audio_dir, audio_filename)
+                shutil.copy(source_audio_path, audio_local_path)
+                audio_db_path = f"projects/{project_id}/audio/{audio_filename}"
         except Exception as e:
             flash(f'Error al copiar el audio del repositorio: {str(e)}', 'error')
             return redirect(url_for('project_detail', project_id=project_id))
-    else:
+    elif has_audio_file:
         audio_filename = secure_filename(audio_file.filename)
         repo_audio_target = os.path.join(sys_uploads_dir, audio_filename)
         audio_file.save(repo_audio_target)
@@ -520,20 +559,41 @@ def upload_track(project_id):
         shutil.copy(repo_text_target, text_local_path)
         text_db_path = f"projects/{project_id}/texts/{text_filename}"
         
-    repo_audio_rel = repo_audio_path if repo_audio_path else f"{repository.SYSTEM_UPLOADS_DIR}/{audio_filename}"
+    repo_audio_rel = repo_audio_path if repo_audio_path else (f"{repository.SYSTEM_UPLOADS_DIR}/{audio_filename}" if audio_filename else "")
 
-    # Default state structure
+    text_tracks = get_project_text_tracks(project)
+    has_audio = bool(audio_db_path)
+    initial_stage = 1 if has_audio else 2
+
+    # Default state structure v2.0
     default_state = {
+        "version": "2.0",
+        "project_type": p_type,
+        "schema": {
+            "has_audio": has_audio,
+            "audio_tracks": [
+                {
+                    "id": "audio_main",
+                    "label": "Audio Principal",
+                    "db_path": audio_db_path
+                }
+            ] if has_audio else [],
+            "text_tracks": text_tracks
+        },
+        "metadata": {
+            "stage": initial_stage,
+            "current_idx": 0
+        },
         "audio_path": audio_db_path,
         "text_path": text_db_path,
         "repo_audio_path": repo_audio_rel,
         "segments": [],
         "current_idx": 0,
-        "stage": 1
+        "stage": initial_stage
     }
     
     database.create_audio_item(project_id, audio_db_path, text_db_path, json.dumps(default_state))
-    flash('Track added successfully!', 'success')
+    flash('Item added successfully!', 'success')
     return redirect(url_for('project_detail', project_id=project_id))
 
 # --- Editor View ---
@@ -582,22 +642,61 @@ def uploaded_file(filename):
 @app.route('/api/get_segment_audio')
 @login_required
 def get_segment_audio():
-    audio_path = request.args.get('path')
-    start = float(request.args.get('start'))
-    end = float(request.args.get('end'))
-    
-    full_path = os.path.join(app.config['UPLOAD_FOLDER'], audio_path)
-    if not os.path.exists(full_path):
+    audio_path = request.args.get('path', '')
+    try:
+        start = float(request.args.get('start', 0))
+    except (ValueError, TypeError):
+        start = 0.0
+    try:
+        end = float(request.args.get('end', 0))
+    except (ValueError, TypeError):
+        end = 0.0
+
+    if not audio_path:
+        return "Missing path parameter", 400
+
+    candidates = [
+        os.path.join(app.config['UPLOAD_FOLDER'], audio_path),
+        os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(audio_path)),
+    ]
+    if g.user:
+        sys_uploads = os.path.join(
+            repository.get_user_repo_base(app.config['UPLOAD_FOLDER'], g.user['id']),
+            repository.SYSTEM_UPLOADS_DIR,
+            os.path.basename(audio_path)
+        )
+        candidates.append(sys_uploads)
+
+    full_path = None
+    for cand in candidates:
+        if os.path.exists(cand) and not os.path.isdir(cand):
+            full_path = cand
+            break
+
+    if not full_path:
         return "File not found", 404
-        
-    audio = AudioSegment.from_file(full_path)
-    segment = audio[int(start*1000):int(end*1000)]
-    
-    buffer = BytesIO()
-    segment.export(buffer, format="mp3")
-    buffer.seek(0)
-    
-    return send_file(buffer, mimetype="audio/mp3")
+
+    try:
+        audio = AudioSegment.from_file(full_path)
+        audio_len = len(audio) / 1000.0
+
+        if end <= 0 or end > audio_len:
+            end = audio_len
+        if start < 0:
+            start = 0.0
+
+        if start >= end:
+            segment = audio[0:100]
+        else:
+            segment = audio[int(start * 1000):int(end * 1000)]
+
+        buffer = BytesIO()
+        segment.export(buffer, format="mp3")
+        buffer.seek(0)
+        return send_file(buffer, mimetype="audio/mp3")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/api/load_text', methods=['GET'])
 @login_required
@@ -615,11 +714,21 @@ def load_text():
 @app.route('/api/detect_segments', methods=['POST'])
 @login_required
 def detect_segments():
-    data = request.json
-    audio_path = os.path.join(app.config['UPLOAD_FOLDER'], data.get('audio_path'))
+    data = request.json or {}
+    raw_path = data.get('audio_path', '')
+    audio_path = os.path.join(app.config['UPLOAD_FOLDER'], raw_path)
     
     if not os.path.exists(audio_path):
-        return jsonify({"error": "Audio file not found"}), 404
+        alt_path = os.path.join(app.config['UPLOAD_FOLDER'], 'System Uploads', os.path.basename(raw_path))
+        if os.path.exists(alt_path):
+            audio_path = alt_path
+        else:
+            repo_base = repository.get_user_repo_base(app.config['UPLOAD_FOLDER'], g.user['id'])
+            alt_repo_path = os.path.join(repo_base, 'System Uploads', os.path.basename(raw_path))
+            if os.path.exists(alt_repo_path):
+                audio_path = alt_repo_path
+            else:
+                return jsonify({"error": f"Audio file not found: {raw_path}"}), 404
     
     audio = AudioSegment.from_file(audio_path)
     duration_ms = len(audio)
@@ -694,11 +803,14 @@ def export_elan(item_id):
     try:
         state = json.loads(item['state_json'])
         segments = state.get('segments', [])
+        schema = state.get('schema', {})
+        text_tracks = schema.get('text_tracks')
     except:
         segments = []
+        text_tracks = None
         
-    audio_filename = item['audio_path'].split('/')[-1]
-    xml_data = elan_exporter.export_elan_xml(audio_filename, segments)
+    audio_filename = item['audio_path'].split('/')[-1] if item['audio_path'] else "track.mp3"
+    xml_data = elan_exporter.export_elan_xml(audio_filename, segments, text_tracks=text_tracks)
     
     buffer = BytesIO()
     buffer.write(xml_data.encode('utf-8'))
@@ -728,28 +840,42 @@ def export_json(item_id):
     try:
         state = json.loads(item['state_json'])
         segments = state.get('segments', [])
+        schema = state.get('schema', {})
+        text_tracks = schema.get('text_tracks', [])
     except:
         state = {}
         segments = []
+        text_tracks = []
         
-    audio_filename = item['audio_path'].split('/')[-1]
+    audio_filename = item['audio_path'].split('/')[-1] if item['audio_path'] else ""
     repo_audio_path = state.get('repo_audio_path')
-    if not repo_audio_path:
+    if not repo_audio_path and audio_filename:
         repo_audio_path = f"{repository.SYSTEM_UPLOADS_DIR}/{audio_filename}"
     
     export_segments = []
     for i, seg in enumerate(segments):
+        start_val = seg.get("start", 0.0)
+        end_val = seg.get("end", 0.0)
+        if isinstance(seg.get("audio"), dict):
+            start_val = seg["audio"].get("start", start_val)
+            end_val = seg["audio"].get("end", end_val)
+            
         cleaned_seg = {
             "id": seg.get("id", f"seg-{i}"),
-            "start": round(seg.get("start", 0.0), 3),
-            "end": round(seg.get("end", 0.0), 3)
+            "start": round(float(start_val), 3),
+            "end": round(float(end_val), 3)
         }
-        if project['type'] != 'segmentation' and 'text' in seg:
-            cleaned_seg["text"] = seg["text"]
+        
+        if 'texts' in seg and isinstance(seg['texts'], dict):
+            cleaned_seg["texts"] = seg["texts"]
+        elif 'text' in seg:
+            cleaned_seg["texts"] = {"src": seg["text"]}
+            
         export_segments.append(cleaned_seg)
         
     export_data = {
         "audio_file": repo_audio_path,
+        "schema": schema,
         "segments": export_segments
     }
         
@@ -757,7 +883,7 @@ def export_json(item_id):
     buffer.write(json.dumps(export_data, indent=2, ensure_ascii=False).encode('utf-8'))
     buffer.seek(0)
     
-    download_name = os.path.splitext(audio_filename)[0] + '.json'
+    download_name = (os.path.splitext(audio_filename)[0] if audio_filename else f"item_{item_id}") + '.json'
     return send_file(
         buffer, 
         mimetype="application/json", 
@@ -781,35 +907,45 @@ def export_csv(item_id):
     try:
         state = json.loads(item['state_json'])
         segments = state.get('segments', [])
+        schema = state.get('schema', {})
+        text_tracks = schema.get('text_tracks', [{"id": "src", "label": "Text"}])
     except:
         segments = []
+        text_tracks = [{"id": "src", "label": "Text"}]
         
-    audio_filename = item['audio_path'].split('/')[-1]
+    audio_filename = item['audio_path'].split('/')[-1] if item['audio_path'] else ""
     
-    has_text = project['type'] != 'segmentation'
-    fieldnames = ["id", "start", "end"]
-    if has_text:
-        fieldnames.append("text")
+    fieldnames = ["id", "start", "end"] + [track.get('id', 'src') for track in text_tracks]
         
     output = StringIO()
     writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator='\n')
     writer.writeheader()
     
     for i, seg in enumerate(segments):
+        start_val = seg.get("start", 0.0)
+        end_val = seg.get("end", 0.0)
+        if isinstance(seg.get("audio"), dict):
+            start_val = seg["audio"].get("start", start_val)
+            end_val = seg["audio"].get("end", end_val)
+            
         row = {
             "id": seg.get("id", f"seg-{i}"),
-            "start": round(seg.get("start", 0.0), 3),
-            "end": round(seg.get("end", 0.0), 3)
+            "start": round(float(start_val), 3),
+            "end": round(float(end_val), 3)
         }
-        if has_text:
-            row["text"] = seg.get("text", "")
+        
+        texts_map = seg.get("texts") if isinstance(seg.get("texts"), dict) else {}
+        for track in text_tracks:
+            t_id = track.get('id', 'src')
+            row[t_id] = texts_map.get(t_id, seg.get("text", "") if t_id == "src" else "")
+            
         writer.writerow(row)
         
     buffer = BytesIO()
     buffer.write(output.getvalue().encode('utf-8-sig'))
     buffer.seek(0)
     
-    download_name = os.path.splitext(audio_filename)[0] + '.csv'
+    download_name = (os.path.splitext(audio_filename)[0] if audio_filename else f"item_{item_id}") + '.csv'
     return send_file(
         buffer, 
         mimetype="text/csv", 
@@ -1031,5 +1167,269 @@ def admin_delete_audio_item(item_id):
     flash('Pista de audio eliminada.', 'success')
     return redirect(url_for('admin_dashboard'))
 
+# --- Module V2 Routes & API ---
+
+@app.route('/v2/')
+@login_required
+def v2_dashboard():
+    v2_projects = database.list_v2_user_projects(g.user['id'])
+    return render_template('v2/dashboard_v2.html', 
+                           owned_projects=v2_projects['owned'], 
+                           shared_projects=v2_projects['shared'])
+
+@app.route('/v2/project/create', methods=['POST'])
+@login_required
+def v2_create_project():
+    name = request.form.get('name', '').strip()
+    description = request.form.get('description', '').strip()
+    project_type = request.form.get('project_type', 'empty').strip()
+    
+    if name:
+        project_id = database.create_project(name, description, 'multichannel_v2', g.user['id'])
+        database.initialize_project_channels(project_id, project_type)
+        flash('¡Proyecto multicanal creado con éxito!', 'success')
+        return redirect(url_for('editor_v2', project_id=project_id))
+    else:
+        flash('El nombre del proyecto es requerido.', 'error')
+        return redirect(url_for('v2_dashboard'))
+
+@app.route('/editor_v2/<int:project_id>')
+@login_required
+def editor_v2(project_id):
+    project = v2_repository.get_v2_project_data(project_id, g.user['id'])
+    if not project:
+        flash('Proyecto no encontrado o sin acceso.', 'error')
+        return redirect(url_for('v2_dashboard'))
+    return render_template('editor_v2.html', project=project)
+
+@app.route('/api/v2/project/<int:project_id>')
+@login_required
+def api_v2_get_project(project_id):
+    project = v2_repository.get_v2_project_data(project_id, g.user['id'])
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+    return jsonify({'project': project})
+
+@app.route('/api/v2/project/<int:project_id>/import', methods=['POST'])
+@login_required
+def api_v2_import_project(project_id):
+    project = database.get_project(project_id, g.user['id'])
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No JSON payload provided'}), 400
+    
+    try:
+        json_data = data.get('project', data)
+        v2_repository.import_project_json(project_id, json_data)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/v2/project/<int:project_id>/export')
+@login_required
+def api_v2_export_project(project_id):
+    project = database.get_project(project_id, g.user['id'])
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+    
+    data = v2_repository.export_project_json(project_id)
+    return jsonify(data)
+
+@app.route('/api/v2/match/save', methods=['POST'])
+@login_required
+def api_v2_save_match():
+    data = request.get_json() or {}
+    project_id = data.get('project_id')
+    segment_ids = data.get('segment_ids', [])
+    
+    if not project_id or not segment_ids:
+        return jsonify({'error': 'project_id and segment_ids required'}), 400
+        
+    try:
+        match_id = v2_repository.create_match_group(project_id, segment_ids)
+        return jsonify({'success': True, 'match_id': match_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/v2/match/<int:match_id>/delete', methods=['POST'])
+@login_required
+def api_v2_delete_match(match_id):
+    v2_repository.remove_match_group(match_id)
+    return jsonify({'success': True})
+
+@app.route('/api/v2/segment/update', methods=['POST'])
+@login_required
+def api_v2_update_segment():
+    data = request.get_json() or {}
+    segment_id = data.get('segment_id')
+    if not segment_id:
+        return jsonify({'error': 'segment_id required'}), 400
+        
+    start_time = data.get('start_time')
+    end_time = data.get('end_time')
+    text_content = data.get('text_content')
+    
+    v2_repository.update_segment_data(segment_id, start_time, end_time, text_content)
+    return jsonify({'success': True})
+
+@app.route('/api/v2/project/<int:project_id>/add_channel', methods=['POST'])
+@login_required
+def api_v2_add_channel(project_id):
+    data = request.get_json() or {}
+    name = data.get('name', '').strip()
+    channel_type = data.get('type', 'audio').strip()
+    
+    if not name or not channel_type:
+        return jsonify({'error': 'Name and type are required'}), 400
+        
+    channel_id = v2_repository.add_channel(project_id, name, channel_type)
+    return jsonify({'success': True, 'channel_id': channel_id})
+
+@app.route('/api/v2/channel/<int:channel_id>', methods=['DELETE', 'POST'])
+@login_required
+def api_v2_delete_channel(channel_id):
+    v2_repository.delete_channel(channel_id)
+    return jsonify({'success': True})
+
+@app.route('/api/v2/channel/update', methods=['POST'])
+@login_required
+def api_v2_update_channel():
+    data = request.get_json() or {}
+    channel_id = data.get('channel_id')
+    name = data.get('name', '').strip()
+    channel_type = data.get('type', '').strip()
+    
+    if not channel_id or not name or not channel_type:
+        return jsonify({'error': 'channel_id, name, and type are required'}), 400
+        
+    v2_repository.update_channel_data(channel_id, name, channel_type)
+    return jsonify({'success': True})
+
+@app.route('/api/v2/channel/<int:channel_id>/add_media', methods=['POST'])
+@login_required
+def api_v2_add_media(channel_id):
+    files = request.files.getlist('media_files') or request.files.getlist('media_file')
+    if not files or all(f.filename == '' for f in files):
+        return jsonify({'error': 'No file selected'}), 400
+
+    sys_uploads_dir = os.path.join(
+        repository.get_user_repo_base(app.config['UPLOAD_FOLDER'], g.user['id']),
+        repository.SYSTEM_UPLOADS_DIR
+    )
+    os.makedirs(sys_uploads_dir, exist_ok=True)
+
+    added_items = []
+    for file in files:
+        if not file or file.filename == '':
+            continue
+
+        filename = secure_filename(file.filename)
+        if not filename:
+            continue
+
+        repo_target = os.path.join(sys_uploads_dir, filename)
+        file.save(repo_target)
+
+        uploads_target = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        try:
+            shutil.copy(repo_target, uploads_target)
+        except Exception:
+            pass
+
+        media_type = request.form.get('media_type')
+        if not media_type:
+            ext = os.path.splitext(filename)[1].lower()
+            if ext in ['.csv']:
+                media_type = 'csv'
+            elif ext in ['.txt']:
+                media_type = 'text'
+            else:
+                media_type = 'audio'
+
+        media_id = v2_repository.add_channel_media(channel_id, filename, media_type=media_type)
+        added_items.append({'media_id': media_id, 'filename': filename})
+
+    if not added_items:
+        return jsonify({'error': 'No valid files processed'}), 400
+
+    return jsonify({'success': True, 'count': len(added_items), 'items': added_items})
+
+@app.route('/api/v2/project/<int:project_id>/import_tabular_media', methods=['POST'])
+@login_required
+def api_v2_import_tabular_media(project_id):
+    files = request.files.getlist('media_files') or request.files.getlist('media_file')
+    if not files or not files[0] or files[0].filename == '':
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    file = files[0]
+    filename = secure_filename(file.filename)
+    if not filename:
+        return jsonify({'error': 'Invalid filename'}), 400
+
+    mappings_raw = request.form.get('column_mappings', '{}')
+    delimiter = request.form.get('delimiter', ',')
+    if delimiter == '\\t':
+        delimiter = '\t'
+
+    try:
+        column_mappings = json.loads(mappings_raw)
+    except Exception:
+        return jsonify({'error': 'Invalid column_mappings format'}), 400
+
+    if not column_mappings:
+        return jsonify({'error': 'No column mappings specified'}), 400
+
+    sys_uploads_dir = os.path.join(
+        repository.get_user_repo_base(app.config['UPLOAD_FOLDER'], g.user['id']),
+        repository.SYSTEM_UPLOADS_DIR
+    )
+    os.makedirs(sys_uploads_dir, exist_ok=True)
+    repo_target = os.path.join(sys_uploads_dir, filename)
+    file.save(repo_target)
+
+    uploads_target = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    try:
+        shutil.copy(repo_target, uploads_target)
+    except Exception:
+        pass
+
+    try:
+        with open(repo_target, 'r', encoding='utf-8-sig', errors='replace') as f:
+            content = f.read()
+    except Exception as e:
+        return jsonify({'error': f'Error reading CSV content: {str(e)}'}), 400
+
+    res = v2_repository.import_tabular_csv_media(
+        project_id=project_id,
+        filename=filename,
+        csv_content=content,
+        column_mappings=column_mappings,
+        delimiter=delimiter
+    )
+
+    if 'error' in res:
+        return jsonify({'error': res['error']}), 400
+
+    return jsonify({'success': True, 'details': res})
+
+@app.route('/api/v2/media/<int:media_id>/save_segments', methods=['POST'])
+@login_required
+def api_v2_save_media_segments(media_id):
+    data = request.get_json() or {}
+    channel_id = data.get('channel_id')
+    segments = data.get('segments', [])
+    
+    if not channel_id:
+        return jsonify({'error': 'channel_id is required'}), 400
+        
+    v2_repository.save_media_segments(media_id, channel_id, segments)
+    return jsonify({'success': True})
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
+
+
+
