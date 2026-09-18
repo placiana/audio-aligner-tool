@@ -1206,6 +1206,170 @@ function selectAlignerSegment(channelId, segId) {
     updateAlignerSelectionUI();
 }
 
+function buildAlignerRows(channels, activeMediaByChannel, projectV2Data) {
+    const totalChannelsCount = channels.length;
+    const matches = projectV2Data.matches || [];
+
+    const segMatchMap = {};
+    matches.forEach(m => {
+        (m.items || []).forEach(it => {
+            if (it.segment_id) {
+                const sId = String(it.segment_id);
+                if (!segMatchMap[sId]) segMatchMap[sId] = [];
+                segMatchMap[sId].push(m);
+            }
+        });
+    });
+
+    function getMatchChannelCount(matchGroup) {
+        const activeChs = new Set();
+        (matchGroup.items || []).forEach(it => {
+            if (it.channel_id && activeMediaByChannel[it.channel_id]) {
+                const mediaSegs = activeMediaByChannel[it.channel_id].segments || [];
+                if (mediaSegs.some(s => String(s.id) === String(it.segment_id))) {
+                    activeChs.add(String(it.channel_id));
+                }
+            }
+        });
+        return activeChs.size;
+    }
+
+    const assignedSegIds = new Set();
+    const totalMatchRows = [];
+
+    // 1. Total Match Groups (all N channels matched) -> Group at top of grid
+    matches.forEach(matchGroup => {
+        const chCount = getMatchChannelCount(matchGroup);
+        if (chCount >= totalChannelsCount && totalChannelsCount > 1) {
+            const rowSegments = {};
+            let hasSeg = false;
+
+            (matchGroup.items || []).forEach(item => {
+                const chData = activeMediaByChannel[item.channel_id];
+                if (chData && chData.segments) {
+                    const seg = chData.segments.find(s => String(s.id) === String(item.segment_id));
+                    if (seg && !assignedSegIds.has(seg.id)) {
+                        rowSegments[item.channel_id] = {
+                            segment: seg,
+                            channel: channels.find(c => String(c.id) === String(item.channel_id)),
+                            activeMedia: chData.media
+                        };
+                        assignedSegIds.add(seg.id);
+                        hasSeg = true;
+                    }
+                }
+            });
+
+            if (hasSeg) {
+                totalMatchRows.push(rowSegments);
+            }
+        }
+    });
+
+    totalMatchRows.sort((rA, rB) => {
+        const segA = Object.values(rA)[0]?.segment;
+        const segB = Object.values(rB)[0]?.segment;
+        const timeA = segA ? (segA.start_time !== undefined && segA.start_time !== null ? segA.start_time : (segA.json_segment_id || 0)) : 0;
+        const timeB = segB ? (segB.start_time !== undefined && segB.start_time !== null ? segB.start_time : (segB.json_segment_id || 0)) : 0;
+        return timeA - timeB;
+    });
+
+    // 2. Remaining unassigned segments per channel in original sequence order
+    const remainingByChannel = {};
+    channels.forEach(ch => {
+        const chData = activeMediaByChannel[ch.id];
+        const segs = chData ? chData.segments : [];
+        remainingByChannel[ch.id] = segs.filter(s => !assignedSegIds.has(s.id));
+    });
+
+    const remainingRows = [];
+
+    // 3. Build sequential rows for partial matches and unassigned segments
+    while (channels.some(ch => remainingByChannel[ch.id].length > 0)) {
+        const rowSegments = {};
+
+        let targetMatchGroup = null;
+        for (const ch of channels) {
+            const headSeg = remainingByChannel[ch.id][0];
+            if (headSeg) {
+                const matchingGroups = segMatchMap[String(headSeg.id)] || [];
+                if (matchingGroups.length > 0) {
+                    targetMatchGroup = matchingGroups[0];
+                    break;
+                }
+            }
+        }
+
+        if (targetMatchGroup) {
+            (targetMatchGroup.items || []).forEach(item => {
+                const chData = activeMediaByChannel[item.channel_id];
+                if (chData && chData.segments && remainingByChannel[item.channel_id]) {
+                    const segIdx = remainingByChannel[item.channel_id].findIndex(s => String(s.id) === String(item.segment_id));
+                    if (segIdx !== -1) {
+                        const [seg] = remainingByChannel[item.channel_id].splice(segIdx, 1);
+                        rowSegments[item.channel_id] = {
+                            segment: seg,
+                            channel: channels.find(c => String(c.id) === String(item.channel_id)),
+                            activeMedia: chData.media
+                        };
+                        assignedSegIds.add(seg.id);
+                    }
+                }
+            });
+
+            channels.forEach(ch => {
+                if (!rowSegments[ch.id] && remainingByChannel[ch.id].length > 0) {
+                    const headSeg = remainingByChannel[ch.id][0];
+                    const headMatches = segMatchMap[String(headSeg.id)] || [];
+                    const isMatchedToOther = headMatches.some(m => 
+                        (m.items || []).some(it => String(it.channel_id) !== String(ch.id) && !rowSegments[it.channel_id])
+                    );
+
+                    if (!isMatchedToOther) {
+                        const seg = remainingByChannel[ch.id].shift();
+                        rowSegments[ch.id] = {
+                            segment: seg,
+                            channel: ch,
+                            activeMedia: activeMediaByChannel[ch.id]?.media
+                        };
+                        assignedSegIds.add(seg.id);
+                    }
+                }
+            });
+        } else {
+            channels.forEach(ch => {
+                if (remainingByChannel[ch.id].length > 0) {
+                    const seg = remainingByChannel[ch.id].shift();
+                    rowSegments[ch.id] = {
+                        segment: seg,
+                        channel: ch,
+                        activeMedia: activeMediaByChannel[ch.id]?.media
+                    };
+                    assignedSegIds.add(seg.id);
+                }
+            });
+        }
+
+        if (Object.keys(rowSegments).length === 0) {
+            channels.forEach(ch => {
+                if (remainingByChannel[ch.id].length > 0) {
+                    const seg = remainingByChannel[ch.id].shift();
+                    rowSegments[ch.id] = {
+                        segment: seg,
+                        channel: ch,
+                        activeMedia: activeMediaByChannel[ch.id]?.media
+                    };
+                    assignedSegIds.add(seg.id);
+                }
+            });
+        }
+
+        remainingRows.push(rowSegments);
+    }
+
+    return [...totalMatchRows, ...remainingRows];
+}
+
 function renderAlignerContainer() {
     destroyAlignerWaveSurfers();
 
@@ -1279,55 +1443,8 @@ function renderAlignerContainer() {
         };
     });
 
-    // 3. Build Aligned Rows
-    const rows = [];
-    const assignedSegIds = new Set();
-
-    // A) Process existing matches first
-    (projectV2Data.matches || []).forEach(matchGroup => {
-        const rowSegments = {};
-        let hasActiveSeg = false;
-
-        (matchGroup.items || []).forEach(item => {
-            const chData = activeMediaByChannel[item.channel_id];
-            if (chData && chData.segments) {
-                const seg = chData.segments.find(s => String(s.id) === String(item.segment_id));
-                if (seg && !assignedSegIds.has(seg.id)) {
-                    rowSegments[item.channel_id] = { segment: seg, channel: channels.find(c => String(c.id) === String(item.channel_id)), activeMedia: chData.media };
-                    assignedSegIds.add(seg.id);
-                    hasActiveSeg = true;
-                }
-            }
-        });
-
-        if (hasActiveSeg) {
-            rows.push(rowSegments);
-        }
-    });
-
-    // B) Process unassigned segments sequentially
-    const unassignedByChannel = {};
-    channels.forEach(ch => {
-        const chData = activeMediaByChannel[ch.id];
-        const segs = chData ? chData.segments : [];
-        unassignedByChannel[ch.id] = segs.filter(s => !assignedSegIds.has(s.id));
-    });
-
-    const maxUnassigned = Math.max(0, ...channels.map(ch => unassignedByChannel[ch.id].length));
-
-    for (let i = 0; i < maxUnassigned; i++) {
-        const rowSegments = {};
-        channels.forEach(ch => {
-            const list = unassignedByChannel[ch.id];
-            if (i < list.length) {
-                const seg = list[i];
-                const chData = activeMediaByChannel[ch.id];
-                rowSegments[ch.id] = { segment: seg, channel: ch, activeMedia: chData.media };
-                assignedSegIds.add(seg.id);
-            }
-        });
-        rows.push(rowSegments);
-    }
+    // 3. Build Aligned Rows (Total matches at top, partial & unassigned aligned horizontally by row height)
+    const rows = buildAlignerRows(channels, activeMediaByChannel, projectV2Data);
 
     if (rows.length === 0) {
         const emptyNotice = document.createElement('div');
