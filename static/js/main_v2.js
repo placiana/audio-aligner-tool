@@ -27,7 +27,7 @@ function openAddMediaModal(ch) {
         const modal = document.getElementById('add-media-modal');
         if (!modal) return;
         document.getElementById('add-media-channel-id').value = ch.id;
-        document.getElementById('add-media-channel-info').innerHTML = `Agregando nuevo slot de media al canal <strong>${escapeHtml(ch.name)}</strong> (${ch.type}).`;
+        document.getElementById('add-media-channel-info').innerHTML = `Agregando nuevo contenido al canal <strong>${escapeHtml(ch.name)}</strong> (${ch.type}).`;
         document.getElementById('media-file').value = '';
         modal.style.display = 'flex';
     } else {
@@ -210,6 +210,8 @@ function renderChannels() {
                     const cell = document.createElement('div');
                     cell.className = `daw-slot-cell ${slotStatus.cssClass}`;
                     cell.style.marginBottom = '8px';
+                    cell.style.cursor = 'pointer';
+                    cell.title = 'Haz clic para ver la segmentación';
                     cell.innerHTML = `
                         <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
                             <span class="slot-status-badge ${slotStatus.badgeClass}">${slotStatus.label}</span>
@@ -219,6 +221,9 @@ function renderChannels() {
                             ${icon} ${escapeHtml(med.filename)}
                         </div>
                     `;
+                    cell.addEventListener('click', () => {
+                        openTextSegmentationModal(med, ch, slotStatus);
+                    });
                     slotsDiv.appendChild(cell);
                 }
             });
@@ -247,7 +252,7 @@ function initAudioWaveform(containerId, med, ch) {
 
     ws.on('decode', () => {
         (med.segments || []).forEach((seg) => {
-            if (seg.start_time !== None && seg.end_time !== None) {
+            if (seg.start_time !== null && seg.start_time !== undefined && seg.end_time !== null && seg.end_time !== undefined) {
                 const isSelected = selectedSegmentIds.has(seg.id);
                 regions.addRegion({
                     id: `seg-v2-${seg.id}`,
@@ -665,6 +670,10 @@ function setupV2EventListeners() {
         confirmAndSaveSegmentation();
     });
 
+    document.getElementById('close-text-seg-modal-btn')?.addEventListener('click', () => {
+        closeTextSegmentationModal();
+    });
+
     window.addEventListener('click', (e) => {
         const audioModal = document.getElementById('audio-player-modal');
         if (e.target === audioModal) closeAudioPlayerModal();
@@ -672,6 +681,164 @@ function setupV2EventListeners() {
         if (e.target === segModal) closeSegmentationModal();
         const textModal = document.getElementById('add-text-media-modal');
         if (e.target === textModal) textModal.style.display = 'none';
+        const textSegModal = document.getElementById('text-segmentation-modal');
+        if (e.target === textSegModal) closeTextSegmentationModal();
+        const boundaryModal = document.getElementById('segment-boundary-modal');
+        if (e.target === boundaryModal) closeSegmentBoundaryModal();
+    });
+
+    // Boundary Modal Controls
+    document.getElementById('close-boundary-modal-btn')?.addEventListener('click', () => {
+        closeSegmentBoundaryModal();
+    });
+
+    document.getElementById('boundary-cancel-btn')?.addEventListener('click', () => {
+        closeSegmentBoundaryModal();
+    });
+
+    document.getElementById('boundary-play-btn')?.addEventListener('click', () => {
+        if (!boundaryWaveSurfer || !currentBoundaryRegion) return;
+        if (isBoundaryRegionPlaying && boundaryWaveSurfer.isPlaying()) {
+            boundaryWaveSurfer.pause();
+            isBoundaryRegionPlaying = false;
+            const playBtn = document.getElementById('boundary-play-btn');
+            if (playBtn) playBtn.innerHTML = '▶ Reproducir Segmento';
+        } else {
+            isBoundaryRegionPlaying = true;
+            boundaryWaveSurfer.setTime(currentBoundaryRegion.start);
+            boundaryWaveSurfer.play();
+            const playBtn = document.getElementById('boundary-play-btn');
+            if (playBtn) playBtn.innerHTML = '⏸ Pausar Segmento';
+        }
+    });
+
+    document.getElementById('boundary-play-all-btn')?.addEventListener('click', () => {
+        if (!boundaryWaveSurfer) return;
+        isBoundaryRegionPlaying = false;
+        boundaryWaveSurfer.playPause();
+        const isPlaying = boundaryWaveSurfer.isPlaying();
+        const playAllBtn = document.getElementById('boundary-play-all-btn');
+        if (playAllBtn) playAllBtn.innerHTML = isPlaying ? '⏸ Pausa' : '⏯ Reproducir Todo';
+    });
+
+    document.getElementById('boundary-start-minus')?.addEventListener('click', () => {
+        if (!currentBoundaryRegion) return;
+        const newStart = Math.max(0, Number((currentBoundaryRegion.start - 0.1).toFixed(3)));
+        currentBoundaryRegion.setOptions({ start: newStart });
+        updateBoundaryDisplays(newStart, currentBoundaryRegion.end);
+    });
+
+    document.getElementById('boundary-start-plus')?.addEventListener('click', () => {
+        if (!currentBoundaryRegion) return;
+        const newStart = Math.min(currentBoundaryRegion.end - 0.05, Number((currentBoundaryRegion.start + 0.1).toFixed(3)));
+        currentBoundaryRegion.setOptions({ start: newStart });
+        updateBoundaryDisplays(newStart, currentBoundaryRegion.end);
+    });
+
+    document.getElementById('boundary-end-minus')?.addEventListener('click', () => {
+        if (!currentBoundaryRegion) return;
+        const newEnd = Math.max(currentBoundaryRegion.start + 0.05, Number((currentBoundaryRegion.end - 0.1).toFixed(3)));
+        currentBoundaryRegion.setOptions({ end: newEnd });
+        updateBoundaryDisplays(currentBoundaryRegion.start, newEnd);
+    });
+
+    document.getElementById('boundary-end-plus')?.addEventListener('click', () => {
+        if (!currentBoundaryRegion) return;
+        const totalDur = boundaryWaveSurfer ? boundaryWaveSurfer.getDuration() : 999999;
+        const newEnd = Math.min(totalDur, Number((currentBoundaryRegion.end + 0.1).toFixed(3)));
+        currentBoundaryRegion.setOptions({ end: newEnd });
+        updateBoundaryDisplays(currentBoundaryRegion.start, newEnd);
+    });
+
+    document.getElementById('boundary-zoom-slider')?.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        const label = document.getElementById('boundary-zoom-value');
+        if (label) label.innerText = `${val} px/s`;
+        if (boundaryWaveSurfer) {
+            boundaryWaveSurfer.zoom(val);
+            if (currentBoundaryRegion) {
+                const wrapper = document.getElementById('boundary-waveform-wrapper');
+                if (wrapper) {
+                    const centerTime = (currentBoundaryRegion.start + currentBoundaryRegion.end) / 2;
+                    const centerPx = centerTime * val;
+                    wrapper.scrollLeft = Math.max(0, centerPx - (wrapper.clientWidth / 2));
+                }
+            }
+        }
+    });
+
+    document.getElementById('boundary-save-btn')?.addEventListener('click', async () => {
+        if (!currentBoundarySegment || !currentBoundaryRegion) return;
+        const saveBtn = document.getElementById('boundary-save-btn');
+        const startSec = Number(currentBoundaryRegion.start.toFixed(3));
+        const endSec = Number(currentBoundaryRegion.end.toFixed(3));
+
+        if (endSec <= startSec) {
+            alert('El tiempo de fin debe ser mayor al tiempo de inicio.');
+            return;
+        }
+
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '💾 Guardando...';
+        }
+
+        try {
+            const resp = await fetch('/api/v2/segment/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    segment_id: currentBoundarySegment.id,
+                    start_time: startSec,
+                    end_time: endSec
+                })
+            });
+
+            const res = await resp.json();
+            if (res.success) {
+                currentBoundarySegment.start_time = startSec;
+                currentBoundarySegment.end_time = endSec;
+
+                if (projectV2Data && projectV2Data.channels) {
+                    projectV2Data.channels.forEach(channel => {
+                        (channel.media || []).forEach(m => {
+                            (m.segments || []).forEach(s => {
+                                if (String(s.id) === String(currentBoundarySegment.id)) {
+                                    s.start_time = startSec;
+                                    s.end_time = endSec;
+                                }
+                            });
+                        });
+                    });
+                }
+
+                await refreshV2Data();
+                closeSegmentBoundaryModal();
+                renderAlignerContainer();
+            } else {
+                alert('Error al guardar segmento: ' + (res.error || 'Error desconocido'));
+            }
+        } catch (err) {
+            console.error('Error saving segment boundaries:', err);
+            alert('Error al conectar con el servidor.');
+        } finally {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '💾 Guardar Segmento';
+            }
+        }
+    });
+
+    window.addEventListener('keydown', (e) => {
+        const boundaryModal = document.getElementById('segment-boundary-modal');
+        if (boundaryModal && boundaryModal.style.display === 'flex') {
+            if (e.key === 'Escape') {
+                closeSegmentBoundaryModal();
+            } else if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                document.getElementById('boundary-play-btn')?.click();
+            }
+        }
     });
 
     document.getElementById('v2-open-aligner-btn')?.addEventListener('click', () => {
@@ -823,6 +990,14 @@ let segRegionsPlugin = null;
 let currentSegmentingMedia = null;
 let currentSegmentingChannel = null;
 
+let boundaryWaveSurfer = null;
+let boundaryRegionsPlugin = null;
+let currentBoundaryRegion = null;
+let currentBoundarySegment = null;
+let currentBoundaryMedia = null;
+let currentBoundaryChannel = null;
+let isBoundaryRegionPlaying = false;
+
 function openAudioPlayerModal(med, ch, slotStatus) {
     currentAudioModalMedia = med;
     currentAudioModalChannel = ch;
@@ -845,9 +1020,9 @@ function openAudioPlayerModal(med, ch, slotStatus) {
     const segBtn = document.getElementById('audio-modal-segment-btn');
     if (segBtn) {
         if (slotStatus.status !== 'raw') {
-            segBtn.innerHTML = '<span class="icon">👁️</span> Ver / Editar segmentación';
+            segBtn.innerHTML = 'Ver / Editar segmentación';
         } else {
-            segBtn.innerHTML = '<span class="icon">✂️</span> Segmentar Audio';
+            segBtn.innerHTML = 'Segmentar Audio';
         }
     }
 
@@ -891,6 +1066,180 @@ function closeAudioPlayerModal() {
         } catch (e) {}
         modalWavesurfer = null;
     }
+}
+
+let currentTextModalMedia = null;
+let currentTextModalChannel = null;
+
+/**
+ * Shared Text Segment Card Component.
+ * Ensures the cell representation in the Text Segmenter is the EXACT same
+ * as in the Aligner grid, allowing seamless simultaneous workflows.
+ */
+function buildTextSegmentCard(seg, ch, options = {}) {
+    const {
+        index = 1,
+        showRadio = false,
+        radioName = `aligner-ch-${ch.id}`,
+        isSelected = false,
+        onSelect = null,
+        showTimestamps = true
+    } = options;
+
+    const status = getSegmentMatchStatus(seg.id);
+
+    const card = document.createElement('div');
+    card.className = `aligner-segment-card status-${status}`;
+    card.setAttribute('data-segment-id', seg.id);
+    card.setAttribute('data-channel-id', ch.id);
+
+    if (isSelected) {
+        card.classList.add('selected-segment-card');
+    }
+
+    let statusBadgeText = 'Sin Match';
+    let statusBadgeStyle = 'background: #fee2e2; color: #991b1b;';
+    if (status === 'all') {
+        statusBadgeText = 'Match Total';
+        statusBadgeStyle = 'background: #dcfce7; color: #166534;';
+    } else if (status === 'partial') {
+        statusBadgeText = 'Match Parcial';
+        statusBadgeStyle = 'background: #fef9c3; color: #854d0e;';
+    }
+
+    const segHeader = document.createElement('div');
+    segHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center; gap: 8px;';
+
+    const leftGroup = document.createElement('div');
+    leftGroup.style.cssText = 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;';
+
+    if (showRadio) {
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.className = 'aligner-seg-radio';
+        radio.name = radioName;
+        radio.value = seg.id;
+        radio.checked = isSelected;
+        radio.style.cssText = 'cursor: pointer; width: 16px; height: 16px; accent-color: var(--ft-claret); margin: 0;';
+        leftGroup.appendChild(radio);
+    }
+
+    const badgeSpan = document.createElement('span');
+    badgeSpan.className = 'ft-badge';
+    badgeSpan.style.cssText = 'font-size: 10px; background: white; border: 1px solid var(--ft-border); font-weight: 700; color: var(--ft-ink);';
+    badgeSpan.innerText = `SEG #${seg.json_segment_id || index}`;
+    leftGroup.appendChild(badgeSpan);
+
+    if (showTimestamps && seg.start_time !== undefined && seg.start_time !== null && seg.end_time !== undefined && seg.end_time !== null) {
+        const timeSpan = document.createElement('span');
+        timeSpan.style.cssText = 'font-size: 10px; color: var(--ft-ink-muted); font-family: monospace; background: white; padding: 2px 5px; border: 1px solid var(--ft-border);';
+        timeSpan.innerText = `⏱️ ${Number(seg.start_time).toFixed(1)}s - ${Number(seg.end_time).toFixed(1)}s`;
+        leftGroup.appendChild(timeSpan);
+    }
+
+    segHeader.appendChild(leftGroup);
+
+    const rightGroup = document.createElement('div');
+    rightGroup.style.cssText = 'display: flex; align-items: center; gap: 6px;';
+
+    const statusBadge = document.createElement('span');
+    statusBadge.style.cssText = `font-size: 10px; font-weight: 800; padding: 2px 6px; text-transform: uppercase; ${statusBadgeStyle}`;
+    statusBadge.innerText = statusBadgeText;
+    rightGroup.appendChild(statusBadge);
+
+    segHeader.appendChild(rightGroup);
+    card.appendChild(segHeader);
+
+    const textContentDiv = document.createElement('div');
+    textContentDiv.className = 'aligner-segment-text';
+    textContentDiv.style.cssText = 'font-size: 13px; color: var(--ft-ink); line-height: 1.4; background: white; padding: 8px 10px; border: 1px solid var(--ft-border); word-break: break-word; white-space: pre-wrap;';
+    textContentDiv.innerText = seg.text_content || seg.text || 'Sin texto';
+    card.appendChild(textContentDiv);
+
+    if (typeof onSelect === 'function') {
+        card.addEventListener('click', (e) => {
+            onSelect(e, seg, card);
+        });
+    }
+
+    return card;
+}
+
+function openTextSegmentationModal(med, ch, slotStatus) {
+    currentTextModalMedia = med;
+    currentTextModalChannel = ch;
+
+    if (!slotStatus || typeof slotStatus !== 'object') {
+        slotStatus = calculateMediaSlotStatus(med, projectV2Data);
+    }
+
+    const modal = document.getElementById('text-segmentation-modal');
+    if (!modal) return;
+
+    // Filename & channel info
+    const filenameEl = document.getElementById('text-seg-modal-filename');
+    if (filenameEl) filenameEl.innerText = med.filename || 'Archivo';
+
+    const subtitleEl = document.getElementById('text-seg-modal-subtitle');
+    if (subtitleEl) {
+        const chName = ch ? (ch.name || 'Canal') : 'Canal';
+        const chType = ch ? (ch.type || 'texto') : 'texto';
+        subtitleEl.innerText = `Canal: ${chName} (${chType})`;
+    }
+
+    const typeBadge = document.getElementById('text-seg-modal-type-badge');
+    if (typeBadge) typeBadge.innerText = (med.media_type || 'text').toUpperCase();
+
+    const statusBadge = document.getElementById('text-seg-modal-status-badge');
+    if (statusBadge) {
+        statusBadge.innerText = slotStatus.label || 'RAW';
+        statusBadge.className = `ft-badge ${slotStatus.badgeClass || ''}`;
+    }
+
+    const segments = med.segments || [];
+    const countBadge = document.getElementById('text-seg-modal-count-badge');
+    if (countBadge) {
+        countBadge.innerText = `${segments.length} Segmentos`;
+    }
+
+    const listContainer = document.getElementById('text-seg-list-container');
+    if (listContainer) {
+        listContainer.innerHTML = '';
+
+        if (segments.length === 0) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.style.cssText = 'text-align: center; padding: 48px 20px; background: white; border: 1px solid var(--ft-border); color: var(--ft-ink-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;';
+            emptyDiv.innerHTML = `
+                <div style="font-size: 36px;">📭</div>
+                <div style="font-weight: 700; font-size: 15px; color: var(--ft-ink);">Sin segmentos registrados</div>
+                <div style="font-size: 13px; max-width: 420px; line-height: 1.4;">Este archivo de texto no contiene segmentos aún. Este espacio está preparado para editar la segmentación o re-segmentar próximamente.</div>
+            `;
+            listContainer.appendChild(emptyDiv);
+        } else {
+            segments.forEach((seg, idx) => {
+                const card = buildTextSegmentCard(seg, ch, {
+                    index: idx + 1,
+                    showRadio: false,
+                    showTimestamps: true,
+                    isSelected: selectedAlignerSegments[ch.id] && String(selectedAlignerSegments[ch.id]) === String(seg.id),
+                    onSelect: (e, segment, cardEl) => {
+                        selectAlignerSegment(ch.id, segment.id);
+                        updateAlignerSelectionUI();
+                    }
+                });
+                listContainer.appendChild(card);
+            });
+        }
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closeTextSegmentationModal() {
+    const modal = document.getElementById('text-segmentation-modal');
+    if (modal) modal.style.display = 'none';
+    currentTextModalMedia = null;
+    currentTextModalChannel = null;
 }
 
 function openSegmentationModal(med, ch) {
@@ -961,14 +1310,28 @@ function openSegmentationModal(med, ch) {
         updateSegmentationCountBadge(segRegionsPlugin.getRegions().length);
     });
 
-    segRegionsPlugin.on('region-created', () => {
+    segRegionsPlugin.on('region-created', (region) => {
         updateSegmentationCountBadge(segRegionsPlugin.getRegions().length);
+        attachContextMenuToRegionV2(region);
+    });
+
+    segWavesurfer.on('play', () => {
+        const btn = document.getElementById('seg-play-btn');
+        if (btn) btn.innerHTML = '⏸ Pausa';
+    });
+
+    segWavesurfer.on('pause', () => {
+        const btn = document.getElementById('seg-play-btn');
+        if (btn) btn.innerHTML = '▶ Play / Pausa';
     });
 }
 
 function closeSegmentationModal() {
     const modal = document.getElementById('segmentation-modal');
     if (modal) modal.style.display = 'none';
+
+    const playBtn = document.getElementById('seg-play-btn');
+    if (playBtn) playBtn.innerHTML = '▶ Play / Pausa';
 
     if (segWavesurfer) {
         try {
@@ -977,6 +1340,184 @@ function closeSegmentationModal() {
         } catch (e) {}
         segWavesurfer = null;
         segRegionsPlugin = null;
+    }
+}
+
+function attachContextMenuToRegionV2(region) {
+    if (!region) return;
+    const bindEvent = () => {
+        if (!region.element || region.element.dataset.hasContextMenu) return;
+        region.element.dataset.hasContextMenu = "true";
+        region.element.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            showSegmentationRegionContextMenu(e, region);
+        });
+    };
+    bindEvent();
+    setTimeout(bindEvent, 0);
+}
+
+function showSegmentationRegionContextMenu(e, region) {
+    let menu = document.getElementById('seg-region-context-menu');
+    if (menu) menu.remove();
+
+    menu = document.createElement('div');
+    menu.id = 'seg-region-context-menu';
+    menu.style.cssText = `
+        position: fixed;
+        left: ${e.clientX}px;
+        top: ${e.clientY}px;
+        background: #ffffff;
+        border: 2.5px solid #1a1a1a;
+        box-shadow: 4px 4px 0px #1a1a1a;
+        z-index: 10000;
+        padding: 4px 0;
+        min-width: 160px;
+        border-radius: 4px;
+        font-family: inherit;
+    `;
+
+    const splitBtn = document.createElement('button');
+    splitBtn.style.cssText = `
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        padding: 8px 14px;
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+        font-size: 13px;
+        color: #1a1a1a;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    `;
+    splitBtn.onmouseenter = () => { splitBtn.style.background = '#f3f4f6'; };
+    splitBtn.onmouseleave = () => { splitBtn.style.background = 'none'; };
+    splitBtn.innerHTML = '<span>✂️</span> <span>Dividir segmento</span>';
+    
+    splitBtn.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        splitSegmentationRegionAtClick(e, region);
+        menu.remove();
+    });
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.style.cssText = `
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        padding: 8px 14px;
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+        font-size: 13px;
+        color: #d32f2f;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    `;
+    deleteBtn.onmouseenter = () => { deleteBtn.style.background = '#fee2e2'; };
+    deleteBtn.onmouseleave = () => { deleteBtn.style.background = 'none'; };
+    deleteBtn.innerHTML = '<span>🗑️</span> <span>Eliminar segmento</span>';
+
+    deleteBtn.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        deleteSegmentationRegion(region);
+        menu.remove();
+    });
+
+    menu.appendChild(splitBtn);
+    menu.appendChild(deleteBtn);
+    document.body.appendChild(menu);
+
+    const closeMenu = (evt) => {
+        if (menu && !menu.contains(evt.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+            document.removeEventListener('contextmenu', closeMenu);
+            document.removeEventListener('keydown', handleEsc);
+        }
+    };
+    const handleEsc = (evt) => {
+        if (evt.key === 'Escape') {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+            document.removeEventListener('contextmenu', closeMenu);
+            document.removeEventListener('keydown', handleEsc);
+        }
+    };
+
+    setTimeout(() => {
+        document.addEventListener('click', closeMenu);
+        document.addEventListener('contextmenu', closeMenu);
+        document.addEventListener('keydown', handleEsc);
+    }, 10);
+}
+
+function splitSegmentationRegionAtClick(e, region) {
+    if (!segWavesurfer || !segRegionsPlugin) return;
+
+    const wrapper = segWavesurfer.getWrapper();
+    if (!wrapper) return;
+
+    const rect = wrapper.getBoundingClientRect();
+    const x = e.clientX - rect.left + wrapper.scrollLeft;
+    const percentage = Math.max(0, Math.min(1, x / wrapper.scrollWidth));
+    const splitTime = percentage * segWavesurfer.getDuration();
+
+    if (splitTime <= region.start + 0.05 || splitTime >= region.end - 0.05) return;
+
+    const origStart = region.start;
+    const origEnd = region.end;
+    const origContent = region.content || '';
+
+    region.remove();
+
+    segRegionsPlugin.addRegion({
+        start: origStart,
+        end: splitTime,
+        content: origContent,
+        color: 'rgba(153, 15, 61, 0.25)',
+        drag: true,
+        resize: true
+    });
+
+    segRegionsPlugin.addRegion({
+        start: splitTime,
+        end: origEnd,
+        content: 'Nuevo Segmento',
+        color: 'rgba(153, 15, 61, 0.25)',
+        drag: true,
+        resize: true
+    });
+
+    const allRegions = segRegionsPlugin.getRegions();
+    allRegions.sort((a, b) => a.start - b.start);
+    allRegions.forEach((r, idx) => {
+        if (r.setOptions) {
+            r.setOptions({ content: `Seg #${idx + 1}` });
+        }
+    });
+
+    updateSegmentationCountBadge(allRegions.length);
+}
+
+function deleteSegmentationRegion(region) {
+    if (!region) return;
+    region.remove();
+    if (segRegionsPlugin) {
+        const allRegions = segRegionsPlugin.getRegions();
+        allRegions.sort((a, b) => a.start - b.start);
+        allRegions.forEach((r, idx) => {
+            if (r.setOptions) {
+                r.setOptions({ content: `Seg #${idx + 1}` });
+            }
+        });
+        updateSegmentationCountBadge(allRegions.length);
     }
 }
 
@@ -1082,6 +1623,218 @@ async function deleteMatch(matchId) {
         refreshV2Data();
     }
 }
+
+function updateBoundaryDisplays(startTime, endTime) {
+    const s = Math.max(0, Number(startTime) || 0);
+    const e = Math.max(s, Number(endTime) || 0);
+    const d = Math.max(0, e - s);
+
+    const sEl = document.getElementById('boundary-start-display');
+    if (sEl) sEl.innerText = `${s.toFixed(3)}s`;
+
+    const eEl = document.getElementById('boundary-end-display');
+    if (eEl) eEl.innerText = `${e.toFixed(3)}s`;
+
+    const dEl = document.getElementById('boundary-duration-display');
+    if (dEl) dEl.innerText = `${d.toFixed(3)}s`;
+}
+
+function closeSegmentBoundaryModal() {
+    const modal = document.getElementById('segment-boundary-modal');
+    if (modal) modal.style.display = 'none';
+
+    if (boundaryWaveSurfer) {
+        try {
+            boundaryWaveSurfer.pause();
+            boundaryWaveSurfer.destroy();
+        } catch (e) {}
+        boundaryWaveSurfer = null;
+        boundaryRegionsPlugin = null;
+        currentBoundaryRegion = null;
+    }
+
+    currentBoundarySegment = null;
+    currentBoundaryMedia = null;
+    currentBoundaryChannel = null;
+    isBoundaryRegionPlaying = false;
+}
+
+function openSegmentBoundaryModal(seg, activeMedia, ch) {
+    if (!seg || !activeMedia) return;
+
+    currentBoundarySegment = seg;
+    currentBoundaryMedia = activeMedia;
+    currentBoundaryChannel = ch;
+    isBoundaryRegionPlaying = false;
+
+    // Pause any playing audio instances in the aligner
+    if (alignerWaveSurferInstances && alignerWaveSurferInstances.length > 0) {
+        alignerWaveSurferInstances.forEach(ws => {
+            try {
+                if (ws && typeof ws.isPlaying === 'function' && ws.isPlaying()) {
+                    ws.pause();
+                }
+            } catch (e) {}
+        });
+    }
+
+    const modal = document.getElementById('segment-boundary-modal');
+    if (!modal) return;
+
+    // Set header info
+    const segBadge = document.getElementById('boundary-modal-seg-badge');
+    if (segBadge) {
+        segBadge.innerText = `SEG #${seg.json_segment_id || seg.id}`;
+    }
+    const filenameEl = document.getElementById('boundary-modal-filename');
+    if (filenameEl) {
+        filenameEl.innerText = activeMedia.filename || 'audio.mp3';
+    }
+
+    const segStart = (seg.start_time !== undefined && seg.start_time !== null) ? Number(seg.start_time) : 0;
+    const segEnd = (seg.end_time !== undefined && seg.end_time !== null) ? Number(seg.end_time) : (segStart + 5);
+    updateBoundaryDisplays(segStart, segEnd);
+
+    // Reset buttons
+    const playSegBtn = document.getElementById('boundary-play-btn');
+    if (playSegBtn) playSegBtn.innerHTML = '▶ Reproducir Segmento';
+    const playAllBtn = document.getElementById('boundary-play-all-btn');
+    if (playAllBtn) playAllBtn.innerHTML = '⏯ Reproducir Todo';
+
+    // Show modal
+    modal.style.display = 'flex';
+
+    // Destroy existing wavesurfer if any
+    if (boundaryWaveSurfer) {
+        try {
+            boundaryWaveSurfer.pause();
+            boundaryWaveSurfer.destroy();
+        } catch (e) {}
+        boundaryWaveSurfer = null;
+        boundaryRegionsPlugin = null;
+        currentBoundaryRegion = null;
+    }
+
+    const container = document.getElementById('boundary-waveform-container');
+    if (container) container.innerHTML = '';
+
+    // Calculate zoom level to show segment + margin
+    const segDuration = Math.max(0.1, segEnd - segStart);
+    const margin = Math.max(1.5, segDuration * 0.25);
+    const viewSpan = segDuration + (margin * 2);
+    const wrapper = document.getElementById('boundary-waveform-wrapper');
+    const wrapperWidth = (wrapper && wrapper.clientWidth > 100) ? wrapper.clientWidth : 850;
+
+    let targetPxPerSec = Math.round(wrapperWidth / viewSpan);
+    targetPxPerSec = Math.max(20, Math.min(350, targetPxPerSec));
+
+    const zoomSlider = document.getElementById('boundary-zoom-slider');
+    if (zoomSlider) zoomSlider.value = targetPxPerSec;
+    const zoomVal = document.getElementById('boundary-zoom-value');
+    if (zoomVal) zoomVal.innerText = `${targetPxPerSec} px/s`;
+
+    // Create Wavesurfer & Regions
+    boundaryRegionsPlugin = WaveSurfer.Regions.create();
+    const audioUrl = `/uploads/${activeMedia.filename}`;
+
+    boundaryWaveSurfer = WaveSurfer.create({
+        container: '#boundary-waveform-container',
+        waveColor: '#d7cbb9',
+        progressColor: '#990F3D',
+        height: 140,
+        minPxPerSec: targetPxPerSec,
+        url: audioUrl,
+        plugins: [boundaryRegionsPlugin]
+    });
+
+    boundaryWaveSurfer.on('ready', () => {
+        try {
+            boundaryWaveSurfer.zoom(targetPxPerSec);
+        } catch (e) {}
+
+        boundaryRegionsPlugin.clearRegions();
+
+        // 1. Add other segments as context (light, non-draggable/non-resizable)
+        const allSegments = (activeMedia.segments || []);
+        allSegments.forEach((s, idx) => {
+            if (String(s.id) === String(seg.id)) return;
+            const sStart = (s.start_time !== undefined && s.start_time !== null) ? Number(s.start_time) : null;
+            const sEnd = (s.end_time !== undefined && s.end_time !== null) ? Number(s.end_time) : null;
+            if (sStart !== null && sEnd !== null && isFinite(sStart) && isFinite(sEnd) && sEnd > sStart) {
+                boundaryRegionsPlugin.addRegion({
+                    start: sStart,
+                    end: sEnd,
+                    content: `Seg #${s.json_segment_id || (idx + 1)}`,
+                    color: 'rgba(120, 110, 100, 0.12)',
+                    drag: false,
+                    resize: false
+                });
+            }
+        });
+
+        // 2. Add current target segment (editable, prominent claret color)
+        currentBoundaryRegion = boundaryRegionsPlugin.addRegion({
+            id: `boundary-edit-seg-${seg.id}`,
+            start: segStart,
+            end: segEnd,
+            content: `SEG #${seg.json_segment_id || seg.id}`,
+            color: 'rgba(153, 15, 61, 0.35)',
+            drag: true,
+            resize: true
+        });
+
+        currentBoundaryRegion.on('update', () => {
+            updateBoundaryDisplays(currentBoundaryRegion.start, currentBoundaryRegion.end);
+        });
+        currentBoundaryRegion.on('update-end', () => {
+            updateBoundaryDisplays(currentBoundaryRegion.start, currentBoundaryRegion.end);
+        });
+
+        // Scroll to center the segment in the wrapper
+        setTimeout(() => {
+            if (wrapper) {
+                const centerTime = (segStart + segEnd) / 2;
+                const centerPx = centerTime * targetPxPerSec;
+                const scrollPos = Math.max(0, centerPx - (wrapper.clientWidth / 2));
+                wrapper.scrollLeft = scrollPos;
+            }
+        }, 60);
+    });
+
+    boundaryRegionsPlugin.on('region-updated', (reg) => {
+        if (currentBoundaryRegion && reg.id === currentBoundaryRegion.id) {
+            updateBoundaryDisplays(reg.start, reg.end);
+        }
+    });
+
+    boundaryWaveSurfer.on('timeupdate', (currentTime) => {
+        if (isBoundaryRegionPlaying && currentBoundaryRegion) {
+            if (currentTime >= currentBoundaryRegion.end) {
+                boundaryWaveSurfer.pause();
+                isBoundaryRegionPlaying = false;
+                const playBtn = document.getElementById('boundary-play-btn');
+                if (playBtn) playBtn.innerHTML = '▶ Reproducir Segmento';
+            }
+        }
+    });
+
+    boundaryWaveSurfer.on('pause', () => {
+        isBoundaryRegionPlaying = false;
+        const playBtn = document.getElementById('boundary-play-btn');
+        if (playBtn) playBtn.innerHTML = '▶ Reproducir Segmento';
+        const playAllBtn = document.getElementById('boundary-play-all-btn');
+        if (playAllBtn) playAllBtn.innerHTML = '⏯ Reproducir Todo';
+    });
+
+    boundaryWaveSurfer.on('finish', () => {
+        isBoundaryRegionPlaying = false;
+        const playBtn = document.getElementById('boundary-play-btn');
+        if (playBtn) playBtn.innerHTML = '▶ Reproducir Segmento';
+        const playAllBtn = document.getElementById('boundary-play-all-btn');
+        if (playAllBtn) playAllBtn.innerHTML = '⏯ Reproducir Todo';
+    });
+}
+
 
 async function refreshV2Data() {
     const res = await fetch(`/api/v2/project/${v2ProjectId}`);
@@ -1469,48 +2222,48 @@ function renderAlignerContainer() {
                 const seg = cellData.segment;
                 const activeMedia = cellData.activeMedia;
                 const status = getSegmentMatchStatus(seg.id);
-
-                const card = document.createElement('div');
-                card.className = `aligner-segment-card status-${status}`;
-                card.setAttribute('data-segment-id', seg.id);
-                card.setAttribute('data-channel-id', ch.id);
-
-                let statusBadgeText = 'Sin Match';
-                let statusBadgeStyle = 'background: #fee2e2; color: #991b1b;';
-                if (status === 'all') {
-                    statusBadgeText = 'Match Total';
-                    statusBadgeStyle = 'background: #dcfce7; color: #166534;';
-                } else if (status === 'partial') {
-                    statusBadgeText = 'Match Parcial';
-                    statusBadgeStyle = 'background: #fef9c3; color: #854d0e;';
-                }
-
-                const segHeader = document.createElement('div');
-                segHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center; gap: 8px;';
-
                 const radioName = `aligner-ch-${ch.id}`;
                 const isSelected = selectedAlignerSegments[ch.id] && String(selectedAlignerSegments[ch.id]) === String(seg.id);
-                if (isSelected) card.classList.add('selected-segment-card');
-
-                segHeader.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <input type="radio" class="aligner-seg-radio" name="${radioName}" value="${seg.id}" ${isSelected ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px; accent-color: var(--ft-claret);">
-                        <span class="ft-badge" style="font-size: 10px; background: white; border: 1px solid var(--ft-border);">SEG #${seg.json_segment_id || (rIdx + 1)}</span>
-                    </div>
-                    <span style="font-size: 10px; font-weight: 800; padding: 2px 6px; text-transform: uppercase; ${statusBadgeStyle}">${statusBadgeText}</span>
-                `;
-                card.appendChild(segHeader);
-
-                card.addEventListener('click', (e) => {
-                    if (e.target.closest('.play-aligner-wave-btn') || e.target.closest('[id^="aligner-wave-"]')) {
-                        return;
-                    }
-                    selectAlignerSegment(ch.id, seg.id);
-                });
 
                 if (ch.type === 'audio') {
+                    const card = document.createElement('div');
+                    card.className = `aligner-segment-card status-${status}`;
+                    card.setAttribute('data-segment-id', seg.id);
+                    card.setAttribute('data-channel-id', ch.id);
+
+                    let statusBadgeText = 'Sin Match';
+                    let statusBadgeStyle = 'background: #fee2e2; color: #991b1b;';
+                    if (status === 'all') {
+                        statusBadgeText = 'Match Total';
+                        statusBadgeStyle = 'background: #dcfce7; color: #166534;';
+                    } else if (status === 'partial') {
+                        statusBadgeText = 'Match Parcial';
+                        statusBadgeStyle = 'background: #fef9c3; color: #854d0e;';
+                    }
+
+                    const segHeader = document.createElement('div');
+                    segHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center; gap: 8px;';
+                    if (isSelected) card.classList.add('selected-segment-card');
+
+                    segHeader.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="radio" class="aligner-seg-radio" name="${radioName}" value="${seg.id}" ${isSelected ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px; accent-color: var(--ft-claret);">
+                            <span class="ft-badge" style="font-size: 10px; background: white; border: 1px solid var(--ft-border);">SEG #${seg.json_segment_id || (rIdx + 1)}</span>
+                        </div>
+                        <span style="font-size: 10px; font-weight: 800; padding: 2px 6px; text-transform: uppercase; ${statusBadgeStyle}">${statusBadgeText}</span>
+                    `;
+                    card.appendChild(segHeader);
+
+                    card.addEventListener('click', (e) => {
+                        if (e.target.closest('.play-aligner-wave-btn') || e.target.closest('.aligner-wave-box')) {
+                            return;
+                        }
+                        selectAlignerSegment(ch.id, seg.id);
+                    });
+
                     const waveBox = document.createElement('div');
-                    waveBox.style.cssText = 'background: white; border: 1px solid var(--ft-border); padding: 8px; margin-top: 4px;';
+                    waveBox.className = 'aligner-wave-box';
+                    waveBox.title = 'Haz clic para ver la onda completa y ajustar los límites del segmento';
                     
                     const waveId = `aligner-wave-${seg.id}`;
                     const startTimeVal = (seg.start_time !== undefined && seg.start_time !== null) ? Number(seg.start_time) : 0;
@@ -1518,13 +2271,24 @@ function renderAlignerContainer() {
                     const segDuration = Math.max(0, endTimeVal - startTimeVal);
 
                     waveBox.innerHTML = `
-                        <div id="${waveId}" style="min-height: 40px; margin-bottom: 6px;"></div>
+                        <div id="${waveId}" style="min-height: 40px; margin-bottom: 6px; cursor: pointer;"></div>
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <button type="button" class="ft-button secondary play-aligner-wave-btn" style="padding: 2px 8px; font-size: 11px;">▶ Play / Pausa</button>
-                            <span style="font-size: 10px; font-weight: 700; color: var(--ft-ink-muted);">⏱️ ${startTimeVal.toFixed(1)}s - ${endTimeVal.toFixed(1)}s (${segDuration.toFixed(1)}s)</span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="font-size: 10px; font-weight: 700; color: var(--ft-ink-muted);">⏱️ ${startTimeVal.toFixed(1)}s - ${endTimeVal.toFixed(1)}s (${segDuration.toFixed(1)}s)</span>
+                                <span style="font-size: 11px; cursor: pointer;" title="Ajustar límites">✂️</span>
+                            </div>
                         </div>
                     `;
                     card.appendChild(waveBox);
+
+                    waveBox.addEventListener('click', (e) => {
+                        if (e.target.closest('.play-aligner-wave-btn')) {
+                            return;
+                        }
+                        e.stopPropagation();
+                        openSegmentBoundaryModal(seg, activeMedia, ch);
+                    });
 
                     setTimeout(() => {
                         try {
@@ -1568,14 +2332,21 @@ function renderAlignerContainer() {
                             console.error('WaveSurfer mini error:', e);
                         }
                     }, 50);
-                } else {
-                    const textContentDiv = document.createElement('div');
-                    textContentDiv.style.cssText = 'font-size: 13px; color: var(--ft-ink); line-height: 1.4; background: white; padding: 8px; border: 1px solid var(--ft-border); word-break: break-word;';
-                    textContentDiv.innerText = seg.text_content || seg.text || 'Sin texto';
-                    card.appendChild(textContentDiv);
-                }
 
-                cell.appendChild(card);
+                    cell.appendChild(card);
+                } else {
+                    const card = buildTextSegmentCard(seg, ch, {
+                        index: rIdx + 1,
+                        showRadio: true,
+                        radioName: radioName,
+                        isSelected: isSelected,
+                        showTimestamps: false,
+                        onSelect: (e, segment) => {
+                            selectAlignerSegment(ch.id, segment.id);
+                        }
+                    });
+                    cell.appendChild(card);
+                }
             }
 
             container.appendChild(cell);

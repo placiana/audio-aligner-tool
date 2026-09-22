@@ -56,7 +56,7 @@ body {
 }
 
 .v2-masthead-title {
-    font-family: var(--font-serif);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-size: 26px;
     font-weight: 700;
     color: var(--ft-claret-dark);
@@ -619,4 +619,20 @@ body {
     display: flex;
     align-items: center;
     gap: 4px;
+}
+
+.aligner-wave-box {
+    background: white;
+    border: 1px solid var(--ft-border);
+    padding: 8px;
+    margin-top: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border-radius: 2px;
+}
+
+.aligner-wave-box:hover {
+    border-color: var(--ft-claret);
+    box-shadow: 0 2px 8px rgba(153, 15, 61, 0.15);
+    background: #fffdfc;
 }

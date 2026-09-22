@@ -273,6 +273,7 @@ function renderRegions() {
         if (!isViewer && currentState.stage === 1) {
             region.element.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 showRegionContextMenu(e, region);
             });
         }
@@ -313,36 +314,77 @@ function showRegionContextMenu(e, region) {
         color: var(--text-color);
     `;
     splitBtn.innerText = window.currentLang === 'es' ? '✂️ Dividir segmento' : '✂️ Split Segment';
-    splitBtn.addEventListener('click', () => {
+    splitBtn.addEventListener('click', (evt) => {
+        evt.stopPropagation();
         splitSegmentAtClick(e, region);
         menu.remove();
     });
 
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'dropdown-item';
+    deleteBtn.style.cssText = `
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        padding: 8px 15px;
+        font-weight: 800;
+        font-family: inherit;
+        cursor: pointer;
+        font-size: 13px;
+        color: #dc2626;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    `;
+    deleteBtn.innerText = window.currentLang === 'es' ? '🗑️ Eliminar segmento' : '🗑️ Delete Segment';
+    deleteBtn.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        deleteSegmentAtClick(region);
+        menu.remove();
+    });
+
     menu.appendChild(splitBtn);
+    menu.appendChild(deleteBtn);
     document.body.appendChild(menu);
 
-    const closeMenu = () => {
-        menu.remove();
-        document.removeEventListener('click', closeMenu);
-        document.removeEventListener('contextmenu', closeMenu);
+    const closeMenu = (evt) => {
+        if (menu && !menu.contains(evt.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+            document.removeEventListener('contextmenu', closeMenu);
+            document.removeEventListener('keydown', handleEsc);
+        }
     };
+    const handleEsc = (evt) => {
+        if (evt.key === 'Escape') {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+            document.removeEventListener('contextmenu', closeMenu);
+            document.removeEventListener('keydown', handleEsc);
+        }
+    };
+
     setTimeout(() => {
         document.addEventListener('click', closeMenu);
         document.addEventListener('contextmenu', closeMenu);
+        document.addEventListener('keydown', handleEsc);
     }, 10);
 }
 
 function splitSegmentAtClick(e, region) {
     if (!wsFull) return;
-    const rect = wsFull.getWrapper().getBoundingClientRect();
-    const x = e.clientX - rect.left + wsFull.getWrapper().scrollLeft;
-    const percentage = x / wsFull.getWrapper().scrollWidth;
+    const wrapper = wsFull.getWrapper();
+    if (!wrapper) return;
+    const rect = wrapper.getBoundingClientRect();
+    const x = e.clientX - rect.left + wrapper.scrollLeft;
+    const percentage = Math.max(0, Math.min(1, x / wrapper.scrollWidth));
     const splitTime = percentage * wsFull.getDuration();
 
     const idx = currentState.segments.findIndex(s => s.id === region.id);
     if (idx === -1) return;
     const targetSeg = currentState.segments[idx];
-    if (splitTime <= targetSeg.start || splitTime >= targetSeg.end) return;
+    if (splitTime <= targetSeg.start + 0.05 || splitTime >= targetSeg.end - 0.05) return;
 
     const firstPart = {
         ...targetSeg,
@@ -357,6 +399,15 @@ function splitSegmentAtClick(e, region) {
     currentState.segments[idx] = firstPart;
     currentState.segments.splice(idx + 1, 0, secondPart);
 
+    renderRegions();
+    saveState();
+}
+
+function deleteSegmentAtClick(region) {
+    if (!currentState || !currentState.segments) return;
+    const idx = currentState.segments.findIndex(s => s.id === region.id);
+    if (idx === -1) return;
+    currentState.segments.splice(idx, 1);
     renderRegions();
     saveState();
 }
