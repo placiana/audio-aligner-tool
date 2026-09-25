@@ -1350,6 +1350,26 @@ def api_v2_add_media(channel_id):
                 media_type = 'audio'
 
         media_id = v2_repository.add_channel_media(channel_id, filename, media_type=media_type)
+
+        target_path = uploads_target if os.path.exists(uploads_target) else repo_target
+        ext = os.path.splitext(filename)[1].lower()
+        if media_type in ['text', 'transcript', 'translation', 'txt'] or ext in ['.txt', '.text']:
+            try:
+                with open(target_path, 'r', encoding='utf-8-sig', errors='replace') as tf:
+                    text_content = tf.read().strip()
+                v2_repository.save_media_segments(
+                    media_id=media_id,
+                    channel_id=channel_id,
+                    segments=[{
+                        'start': 0.0,
+                        'end': 0.0,
+                        'text': text_content,
+                        'json_segment_id': 1
+                    }]
+                )
+            except Exception as e:
+                print(f"Error auto-segmenting text file: {e}")
+
         added_items.append({'media_id': media_id, 'filename': filename})
 
     if not added_items:
@@ -1427,6 +1447,61 @@ def api_v2_save_media_segments(media_id):
         
     v2_repository.save_media_segments(media_id, channel_id, segments)
     return jsonify({'success': True})
+
+@app.route('/api/v2/media/<int:media_id>/reset_segmentation', methods=['POST'])
+@login_required
+def api_v2_reset_media_segmentation(media_id):
+    data = request.get_json() or {}
+    channel_id = data.get('channel_id')
+    
+    if not channel_id:
+        return jsonify({'error': 'channel_id is required'}), 400
+
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM v2_media WHERE id = ?", (media_id,))
+    media_row = cursor.fetchone()
+    conn.close()
+
+    if not media_row:
+        return jsonify({'error': 'Media not found'}), 404
+
+    filename = media_row['filename']
+    
+    sys_uploads_dir = os.path.join(
+        repository.get_user_repo_base(app.config['UPLOAD_FOLDER'], g.user['id']),
+        repository.SYSTEM_UPLOADS_DIR
+    )
+    repo_target = os.path.join(sys_uploads_dir, filename)
+    uploads_target = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    
+    target_path = None
+    if os.path.exists(uploads_target):
+        target_path = uploads_target
+    elif os.path.exists(repo_target):
+        target_path = repo_target
+
+    if target_path and os.path.exists(target_path):
+        try:
+            with open(target_path, 'r', encoding='utf-8-sig', errors='replace') as tf:
+                original_text = tf.read().strip()
+        except Exception as e:
+            return jsonify({'error': f'Error reading original file: {str(e)}'}), 500
+    else:
+        return jsonify({'error': f'Original file "{filename}" not found on server'}), 404
+
+    v2_repository.save_media_segments(
+        media_id=media_id,
+        channel_id=channel_id,
+        segments=[{
+            'start': 0.0,
+            'end': 0.0,
+            'text': original_text,
+            'json_segment_id': 1
+        }]
+    )
+
+    return jsonify({'success': True, 'text': original_text})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

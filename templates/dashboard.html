@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Dashboard - Audio Aligner{% endblock %}
+{% block title %}Panel Principal - Audio Aligner{% endblock %}
 
 {% block content %}
 <div style="display: grid; grid-template-columns: 1fr 350px; gap: 30px; margin-top: 20px;">
@@ -9,7 +9,7 @@
     <div>
         <div class="brutalist-card">
             <h2 style="margin-top: 0; font-size: 22px; font-weight: 900; text-transform: uppercase; border-bottom: var(--border-width) solid var(--border-color); padding-bottom: 15px;" data-i18n="projects_title">
-                Your Workspaces / Projects
+                Tus Espacios de Trabajo / Proyectos
             </h2>
             
             {% if projects %}
@@ -32,18 +32,18 @@
                             </span>
                         </div>
                         <p style="margin: 5px 0 0 0; color: var(--text-color); opacity: 0.8; font-size: 14px; font-weight: 600;">
-                            {{ p.description or 'No description provided.' }}
+                            {{ p.description or 'Sin descripción proporcionada.' }}
                         </p>
                     </div>
                     <a href="/project/{{ p.id }}" class="brutalist-button secondary-btn button-link" style="padding: 8px 16px;" data-i18n="open_btn">
-                        Open Project
+                        Abrir Proyecto
                     </a>
                 </div>
                 {% endfor %}
             </div>
             {% else %}
             <div style="text-align: center; padding: 40px; font-weight: 800; font-size: 1.1em; opacity: 0.8;" data-i18n="no_projects">
-                📁 No projects yet. Create a project on the right to get started!
+                📁 Aún no hay proyectos. ¡Crea un proyecto a la derecha para comenzar!
             </div>
             {% endif %}
         </div>
@@ -56,30 +56,30 @@
         <div class="brutalist-card repo-preview-card" style="position: relative; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;" onclick="window.location.href='/repository'">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: var(--border-width) solid var(--border-color); padding-bottom: 10px; margin-bottom: 12px;">
                 <h3 style="margin: 0; font-size: 18px; font-weight: 900; text-transform: uppercase; display: flex; align-items: center; gap: 8px;" data-i18n="repo_title">
-                    📁 Your Repository
+                    📁 Tu Repositorio
                 </h3>
                 <span class="block-badge" style="background: var(--accent-secondary); color: var(--sec-btn-text-color, var(--text-color)); font-size: 11px; padding: 2px 6px;">
-                    {{ repo_summary.file_count }} <span data-i18n="total_files">files</span>
+                    {{ repo_summary.file_count }} <span data-i18n="total_files">archivos</span>
                 </span>
             </div>
 
             <p style="margin: 0 0 12px 0; opacity: 0.8; font-size: 13px; font-weight: 600;" data-i18n="repo_preview_desc">
-                Isolated personal file repository to upload, organize, and manage your files.
+                Sistema de archivos autocontenido y aislado para organizar, subir y gestionar tus archivos.
             </p>
 
             <!-- Stats pill row -->
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; text-align: center;">
                 <div class="repo-stat-box">
                     <div style="font-size: 15px; font-weight: 900;">{{ repo_summary.file_count }}</div>
-                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; opacity: 0.7;" data-i18n="total_files">Files</div>
+                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; opacity: 0.7;" data-i18n="total_files">Archivos</div>
                 </div>
                 <div class="repo-stat-box">
                     <div style="font-size: 15px; font-weight: 900;">{{ repo_summary.folder_count }}</div>
-                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; opacity: 0.7;" data-i18n="total_folders">Folders</div>
+                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; opacity: 0.7;" data-i18n="total_folders">Carpetas</div>
                 </div>
                 <div class="repo-stat-box">
                     <div style="font-size: 13px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ repo_summary.formatted_size }}</div>
-                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; opacity: 0.7;" data-i18n="storage_used">Size</div>
+                    <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; opacity: 0.7;" data-i18n="storage_used">Tamaño</div>
                 </div>
             </div>
 
@@ -87,7 +87,7 @@
             {% if repo_summary.top_items %}
             <div class="repo-stat-box" style="padding: 10px; margin-bottom: 12px;">
                 <div style="font-size: 10px; font-weight: 900; text-transform: uppercase; opacity: 0.7; margin-bottom: 6px; border-bottom: 1px solid var(--border-color); padding-bottom: 3px;" data-i18n="recent_preview">
-                    Contents Preview
+                    Vista previa del contenido
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 5px;">
                     {% for item in repo_summary.top_items %}
@@ -102,28 +102,28 @@
             </div>
             {% else %}
             <div style="background: white; border: 2px solid var(--border-color); padding: 10px; margin-bottom: 12px; font-size: 12px; font-weight: 700; color: #666; text-align: center;" data-i18n="empty_repo_preview">
-                📭 Repository is empty. Click to upload files!
+                📭 El repositorio está vacío. ¡Haz clic para subir archivos!
             </div>
             {% endif %}
 
             <a href="/repository" class="brutalist-button" style="width: 100%; box-shadow: 2px 2px 0px var(--border-color); background: var(--accent-color); text-align: center; text-decoration: none; box-sizing: border-box; font-size: 13px; padding: 10px 15px;" onclick="event.stopPropagation();" data-i18n="open_repo_btn">
-                📁 Open Repository
+                📁 Abrir Repositorio
             </a>
         </div>
 
         <!-- Create Project Panel -->
         <div class="brutalist-card" style="background: var(--accent-tertiary);">
             <h3 style="margin-top: 0; font-size: 18px; font-weight: 900; text-transform: uppercase; border-bottom: 2.5px solid var(--border-color); padding-bottom: 10px;" data-i18n="new_project">
-                New Project
+                Nuevo Proyecto
             </h3>
             <form method="post" action="/project/create" style="display: flex; flex-direction: column; gap: 15px;">
                 <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label for="name" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="project_name">Project Name</label>
-                    <input type="text" id="name" name="name" class="brutalist-input" required placeholder="e.g. Bible - Genesis">
+                    <label for="name" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="project_name">Nombre del Proyecto</label>
+                    <input type="text" id="name" name="name" class="brutalist-input" required placeholder="ej. Biblia - Génesis">
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label for="type" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="project_type_label">Project Type</label>
+                    <label for="type" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="project_type_label">Tipo de Proyecto</label>
                     <select id="type" name="type" class="brutalist-input" style="background: white; cursor: pointer; font-family: inherit;">
                         <option value="alignment" data-i18n="type_alignment">Alineación (Audio + Transcripción)</option>
                         <option value="multichannel_v2" data-i18n="type_multichannel_v2">Multicanal (Audio + Transcripción + Traducción + Relacional)</option>
@@ -136,16 +136,16 @@
                 
                 <div style="display: flex; flex-direction: column; gap: 6px;">
                     <label for="translation_langs" style="font-weight: 800; font-size: 12px; text-transform: uppercase;">Idiomas de Traducción (Separados por coma, ej: ES, EN)</label>
-                    <input type="text" id="translation_langs" name="translation_langs" class="brutalist-input" placeholder="e.g. ES, EN" style="background: white;">
+                    <input type="text" id="translation_langs" name="translation_langs" class="brutalist-input" placeholder="ej. ES, EN" style="background: white;">
                 </div>
                 
                 <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label for="description" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="description">Description</label>
-                    <textarea id="description" name="description" class="brutalist-input" style="height: 80px; resize: none; font-family: inherit;" placeholder="e.g. Aligning Toba Genesis chapters"></textarea>
+                    <label for="description" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="description">Descripción</label>
+                    <textarea id="description" name="description" class="brutalist-input" style="height: 80px; resize: none; font-family: inherit;" placeholder="ej. Alineación de capítulos del Génesis en Toba"></textarea>
                 </div>
                 
                 <button type="submit" class="brutalist-button" style="width: 100%; box-shadow: 2px 2px 0px var(--border-color); background: white;" data-i18n="create_project_btn">
-                    ➕ Create Project
+                    ➕ Crear Proyecto
                 </button>
             </form>
         </div>

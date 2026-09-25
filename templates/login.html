@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}Login - Audio Aligner{% endblock %}
+{% block title %}Iniciar Sesión - Audio Aligner{% endblock %}
 
 {% block content %}
 <div class="brutalist-card" style="max-width: 450px; margin: 60px auto; background: white;">
     <h2 style="margin-top: 0; font-size: 24px; font-weight: 900; border-bottom: 2.5px solid var(--border-color); padding-bottom: 15px; text-transform: uppercase;" data-i18n="login_title">
-        Sign In
+        Iniciar Sesión
     </h2>
 
     <a href="/auth/google" class="brutalist-button" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: white; color: #333; text-decoration: none; box-sizing: border-box; margin-bottom: 20px;">
@@ -15,34 +15,34 @@
             <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.26C.46 8.17 0 9.99 0 12s.46 3.83 1.26 5.42l4.02-3.15z"/>
             <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.25 2.64 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
         </svg>
-        <span data-i18n="google_login_btn">Continue with Google</span>
+        <span data-i18n="google_login_btn">Continuar con Google</span>
     </a>
 
     <div style="display: flex; align-items: center; margin: 20px 0; gap: 10px;">
         <div style="flex: 1; height: 2px; background: var(--border-color, #000);"></div>
-        <span style="font-weight: 900; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;" data-i18n="or_divider">OR</span>
+        <span style="font-weight: 900; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;" data-i18n="or_divider">O</span>
         <div style="flex: 1; height: 2px; background: var(--border-color, #000);"></div>
     </div>
 
     <form method="post" action="/login" style="display: flex; flex-direction: column; gap: 20px;">
         <div style="display: flex; flex-direction: column; gap: 8px;">
-            <label for="username" style="font-weight: 800; font-size: 14px; text-transform: uppercase;" data-i18n="username_label">Username</label>
-            <input type="text" id="username" name="username" class="brutalist-input" required placeholder="Enter your username">
+            <label for="username" style="font-weight: 800; font-size: 14px; text-transform: uppercase;" data-i18n="username_label">Usuario</label>
+            <input type="text" id="username" name="username" class="brutalist-input" required placeholder="Ingresa tu usuario">
         </div>
         
         <div style="display: flex; flex-direction: column; gap: 8px;">
-            <label for="password" style="font-weight: 800; font-size: 14px; text-transform: uppercase;" data-i18n="password_label">Password</label>
-            <input type="password" id="password" name="password" class="brutalist-input" required placeholder="Enter your password">
+            <label for="password" style="font-weight: 800; font-size: 14px; text-transform: uppercase;" data-i18n="password_label">Contraseña</label>
+            <input type="password" id="password" name="password" class="brutalist-input" required placeholder="Ingresa tu contraseña">
         </div>
         
         <button type="submit" class="brutalist-button" style="margin-top: 10px; width: 100%;" data-i18n="login_btn">
-            Sign In
+            Iniciar Sesión
         </button>
     </form>
     
     {% if allow_registration %}
     <p style="margin-top: 25px; font-weight: 700; text-align: center; font-size: 14px;">
-        <span data-i18n="new_user_prompt">New to Audio Aligner?</span> <a href="/register" style="color: var(--text-color); font-weight: 900; text-decoration: underline;" data-i18n="create_account_link">Create an account</a>
+        <span data-i18n="new_user_prompt">¿Nuevo en Audio Aligner?</span> <a href="/register" style="color: var(--text-color); font-weight: 900; text-decoration: underline;" data-i18n="create_account_link">Crear una cuenta</a>
     </p>
     {% endif %}
 </div>

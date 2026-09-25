@@ -56,12 +56,12 @@
                         {{ g.user.username }} <span style="font-size: 10px; transition: transform 0.2s ease; display: inline-block;">▼</span>
                     </button>
                     <div id="user-dropdown-menu" class="brutalist-card" style="display: none; position: absolute; right: 0; top: calc(100% + 8px); width: 180px; z-index: 1000; padding: 5px 0; flex-direction: column;">
-                        <a href="/user/panel" class="dropdown-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--text-color); display: block; border-bottom: var(--border-width) solid var(--border-color);" data-i18n="user_panel_nav">User Panel</a>
-                        <a href="/repository" class="dropdown-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--text-color); display: block; border-bottom: var(--border-width) solid var(--border-color);" data-i18n="nav_repo">Repository</a>
+                        <a href="/user/panel" class="dropdown-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--text-color); display: block; border-bottom: var(--border-width) solid var(--border-color);" data-i18n="user_panel_nav">Panel de Usuario</a>
+                        <a href="/repository" class="dropdown-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--text-color); display: block; border-bottom: var(--border-width) solid var(--border-color);" data-i18n="nav_repo">Repositorio</a>
                         {% if g.user.is_admin %}
-                        <a href="/admin" class="dropdown-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--text-color); display: block; border-bottom: var(--border-width) solid var(--border-color);" data-i18n="admin_nav">Admin Panel</a>
+                        <a href="/admin" class="dropdown-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--text-color); display: block; border-bottom: var(--border-width) solid var(--border-color);" data-i18n="admin_nav">Panel de Admin</a>
                         {% endif %}
-                        <a href="/logout" class="dropdown-item danger-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--danger-color); display: block;" data-i18n="logout_btn">Logout</a>
+                        <a href="/logout" class="dropdown-item danger-item" style="padding: 10px 15px; font-weight: 800; font-size: 13px; text-decoration: none; color: var(--danger-color); display: block;" data-i18n="logout_btn">Cerrar sesión</a>
                     </div>
                 </div>
                 {% endif %}

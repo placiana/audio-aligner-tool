@@ -173,6 +173,7 @@ window.translations = {
         collabs_modal_title: "👥 Project Collaborators",
         add_collab_title: "Add Collaborator",
         add_btn_action: "Add",
+        role_owner: "Owner",
         role_editor: "Editor",
         role_viewer: "Viewer",
         actions_btn: "⚙️ Actions"
@@ -349,6 +350,7 @@ window.translations = {
         collabs_modal_title: "👥 Colaboradores del Proyecto",
         add_collab_title: "Agregar Colaborador",
         add_btn_action: "Agregar",
+        role_owner: "Propietario",
         role_editor: "Editor",
         role_viewer: "Solo lectura",
         actions_btn: "⚙️ Acciones"

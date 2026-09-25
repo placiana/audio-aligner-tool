@@ -1,6 +1,6 @@
 {% extends 'v2/base_v2.html' %}
 
-{% block title %}Dashboard - Financial Times Editorial Edition{% endblock %}
+{% block title %}Panel Principal - Edición Editorial{% endblock %}
 
 {% block content %}
 <!-- Top Action Bar -->
@@ -30,7 +30,7 @@
             <div>
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
                     <h4 class="ft-project-name">{{ p.name }}</h4>
-                    <span class="ft-badge teal">Owner</span>
+                    <span class="ft-badge teal" data-i18n="role_owner">Propietario</span>
                 </div>
                 <p class="ft-project-desc">
                     {{ p.description or 'Sin descripción proporcionada.' }}
@@ -117,7 +117,7 @@
                     <div class="project-type-card selected" data-type="empty">
                         <div class="pt-icon">📁</div>
                         <div class="pt-info">
-                            <div class="pt-title">Vacío (Empty Project)</div>
+                            <div class="pt-title">Proyecto Vacío</div>
                             <div class="pt-desc">Comienza sin canales predefinidos. Podrás estructurar o importar canales más adelante.</div>
                         </div>
                     </div>

@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Repository - Audio Aligner{% endblock %}
+{% block title %}Repositorio - Audio Aligner{% endblock %}
 
 {% block content %}
 <div class="repository-container" style="margin-top: 10px;">
@@ -10,19 +10,19 @@
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
             <div>
                 <a href="/dashboard" class="brutalist-button button-link" style="padding: 6px 12px; font-size: 12px; margin-bottom: 10px; display: inline-block;" data-i18n="back_to_projects">
-                    ⬅ Back to Projects
+                    ⬅ Volver a Proyectos
                 </a>
                 <h2 style="margin: 5px 0 0 0; font-weight: 900; font-size: 24px; text-transform: uppercase; display: flex; align-items: center; gap: 10px;" data-i18n="repo_title">
-                    📁 Your Repository
+                    📁 Tu Repositorio
                 </h2>
             </div>
             
             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                 <button id="btn-new-folder" class="brutalist-button" style="background: var(--accent-secondary);" data-i18n="new_folder">
-                    📁 New Folder
+                    📁 Nueva Carpeta
                 </button>
                 <button id="btn-upload-file" class="brutalist-button" style="background: var(--accent-color);" data-i18n="upload_files">
-                    📤 Upload Files
+                    📤 Subir Archivos
                 </button>
                 <input type="file" id="hidden-file-input" multiple style="display: none;">
             </div>
@@ -37,7 +37,7 @@
     <!-- Drag and Drop Dropzone -->
     <div id="drag-drop-zone" class="brutalist-card" style="background: #fdf4ff; border: 2.5px dashed var(--border-color); box-shadow: none; text-align: center; padding: 25px; cursor: pointer; display: none; transition: all 0.2s ease;">
         <div style="font-size: 28px; margin-bottom: 5px;">📥</div>
-        <strong style="font-size: 16px; text-transform: uppercase;" data-i18n="drop_files_here">Drop files here to upload to current directory</strong>
+        <strong style="font-size: 16px; text-transform: uppercase;" data-i18n="drop_files_here">Arrastra archivos aquí para subirlos a la carpeta actual</strong>
     </div>
 
     <!-- Repository File List -->
@@ -46,10 +46,10 @@
             <table style="width: 100%; border-collapse: collapse; text-align: left;">
                 <thead>
                     <tr style="background: var(--accent-tertiary); border-bottom: 2.5px solid var(--border-color);">
-                        <th style="padding: 15px 20px; font-weight: 900; text-transform: uppercase; font-size: 13px;" data-i18n="th_name">Name</th>
-                        <th style="padding: 15px 15px; font-weight: 900; text-transform: uppercase; font-size: 13px; width: 120px;" data-i18n="th_size">Size</th>
-                        <th style="padding: 15px 15px; font-weight: 900; text-transform: uppercase; font-size: 13px; width: 180px;" data-i18n="th_modified">Modified</th>
-                        <th style="padding: 15px 20px; font-weight: 900; text-transform: uppercase; font-size: 13px; text-align: right; width: 220px;" data-i18n="th_actions">Actions</th>
+                        <th style="padding: 15px 20px; font-weight: 900; text-transform: uppercase; font-size: 13px;" data-i18n="th_name">Nombre</th>
+                        <th style="padding: 15px 15px; font-weight: 900; text-transform: uppercase; font-size: 13px; width: 120px;" data-i18n="th_size">Tamaño</th>
+                        <th style="padding: 15px 15px; font-weight: 900; text-transform: uppercase; font-size: 13px; width: 180px;" data-i18n="th_modified">Modificado</th>
+                        <th style="padding: 15px 20px; font-weight: 900; text-transform: uppercase; font-size: 13px; text-align: right; width: 220px;" data-i18n="th_actions">Acciones</th>
                     </tr>
                 </thead>
                 <tbody id="repo-table-body">
@@ -60,8 +60,8 @@
 
         <div id="repo-empty-state" style="display: none; text-align: center; padding: 50px 20px;">
             <div style="font-size: 40px; margin-bottom: 10px;">📭</div>
-            <h3 style="margin: 0; font-weight: 900; text-transform: uppercase;" data-i18n="empty_repo">This folder is empty</h3>
-            <p style="color: #666; font-weight: 600; margin-top: 5px;" data-i18n="empty_repo_sub">Upload files or create folders using the buttons above.</p>
+            <h3 style="margin: 0; font-weight: 900; text-transform: uppercase;" data-i18n="empty_repo">Esta carpeta está vacía</h3>
+            <p style="color: #666; font-weight: 600; margin-top: 5px;" data-i18n="empty_repo_sub">Sube archivos o crea carpetas usando los botones superiores.</p>
         </div>
     </div>
 </div>
@@ -70,17 +70,17 @@
 <div id="modal-new-folder" class="brutalist-modal" style="display: none;">
     <div class="brutalist-modal-content" style="max-width: 450px; height: auto;">
         <div class="modal-header">
-            <h2 data-i18n="new_folder">📁 New Folder</h2>
+            <h2 data-i18n="new_folder">📁 Nueva Carpeta</h2>
             <button class="brutalist-button modal-close-x" onclick="closeFolderModal()">✕</button>
         </div>
         <form id="form-create-folder" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
             <div style="display: flex; flex-direction: column; gap: 6px;">
-                <label for="folder-name-input" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="folder_name_label">Folder Name</label>
-                <input type="text" id="folder-name-input" class="brutalist-input" required placeholder="e.g. Audios_2026">
+                <label for="folder-name-input" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="folder_name_label">Nombre de la Carpeta</label>
+                <input type="text" id="folder-name-input" class="brutalist-input" required placeholder="ej. Audios_2026">
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-                <button type="button" class="brutalist-button button-link" onclick="closeFolderModal()" data-i18n="cancel_btn">Cancel</button>
-                <button type="submit" class="brutalist-button" style="background: var(--accent-secondary);" data-i18n="create_btn">Create</button>
+                <button type="button" class="brutalist-button button-link" onclick="closeFolderModal()" data-i18n="cancel_btn">Cancelar</button>
+                <button type="submit" class="brutalist-button" style="background: var(--accent-secondary);" data-i18n="create_btn">Crear</button>
             </div>
         </form>
     </div>
@@ -90,18 +90,18 @@
 <div id="modal-rename-item" class="brutalist-modal" style="display: none;">
     <div class="brutalist-modal-content" style="max-width: 450px; height: auto;">
         <div class="modal-header">
-            <h2 data-i18n="rename_item">✏️ Rename Item</h2>
+            <h2 data-i18n="rename_item">✏️ Renombrar Elemento</h2>
             <button class="brutalist-button modal-close-x" onclick="closeRenameModal()">✕</button>
         </div>
         <form id="form-rename-item" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
             <input type="hidden" id="rename-target-path">
             <div style="display: flex; flex-direction: column; gap: 6px;">
-                <label for="rename-name-input" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="new_name_label">New Name</label>
+                <label for="rename-name-input" style="font-weight: 800; font-size: 12px; text-transform: uppercase;" data-i18n="new_name_label">Nuevo Nombre</label>
                 <input type="text" id="rename-name-input" class="brutalist-input" required>
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-                <button type="button" class="brutalist-button button-link" onclick="closeRenameModal()" data-i18n="cancel_btn">Cancel</button>
-                <button type="submit" class="brutalist-button" style="background: var(--accent-color);" data-i18n="save_btn">Save</button>
+                <button type="button" class="brutalist-button button-link" onclick="closeRenameModal()" data-i18n="cancel_btn">Cancelar</button>
+                <button type="submit" class="brutalist-button" style="background: var(--accent-color);" data-i18n="save_btn">Guardar</button>
             </div>
         </form>
     </div>

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Audio Aligner - Editorial Edition{% endblock %}</title>
+    <title>{% block title %}Audio Aligner - Edición Editorial{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style_v2.css') }}">
     {% block extra_head %}{% endblock %}
 </head>
@@ -15,13 +15,13 @@
         <header class="v2-header">
             <div>
                 <h1 class="v2-masthead-title">Audio Aligner</h1>
-                <div class="v2-masthead-sub">Multi-Channel Alignment & Translation Engine</div>
+                <div class="v2-masthead-sub">Motor de Alineación y Traducción Multicanal</div>
             </div>
 
             <div style="display: flex; gap: 15px; align-items: center;">
                 {% if g.user %}
                 <span class="ft-badge" style="font-size: 11px;">{{ g.user.username }}</span>
-                <a href="/logout" class="ft-button secondary" style="font-size: 11px; padding: 6px 12px;">Log Out</a>
+                <a href="/logout" class="ft-button secondary" style="font-size: 11px; padding: 6px 12px;" data-i18n="logout_btn">Cerrar sesión</a>
                 {% endif %}
             </div>
         </header>

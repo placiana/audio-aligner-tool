@@ -1006,25 +1006,61 @@ def add_v2_media(channel_id, filename, media_type="audio"):
     return media_id
 
 def save_v2_media_segments(media_id, channel_id, segments):
-    """Saves segment records for a v2_media item and updates its status to 'segmented'."""
+    """Saves segment records for a v2_media item, updating existing segments in place to preserve match links."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute("DELETE FROM v2_segments WHERE media_id = ?", (media_id,))
+    # Always resolve the media's true channel_id from v2_media to prevent cross-channel contamination
+    cursor.execute("SELECT channel_id FROM v2_media WHERE id = ?", (media_id,))
+    media_row = cursor.fetchone()
+    if media_row and media_row['channel_id']:
+        channel_id = media_row['channel_id']
+
+    # Retrieve existing segments for this media
+    cursor.execute("SELECT id FROM v2_segments WHERE media_id = ?", (media_id,))
+    existing_db_ids = set(r['id'] for r in cursor.fetchall())
     
+    incoming_ids = set()
+
     for idx, seg in enumerate(segments):
-        start_time = float(seg.get('start', 0))
-        end_time = float(seg.get('end', 0))
+        start_time = float(seg['start']) if seg.get('start') is not None else None
+        end_time = float(seg['end']) if seg.get('end') is not None else None
         text_val = seg.get('text', '')
         json_seg_id = seg.get('json_segment_id', idx + 1)
-        
-        cursor.execute(
-            """INSERT INTO v2_segments 
-               (channel_id, media_id, json_segment_id, start_time, end_time, text_content, segment_order) 
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (channel_id, media_id, json_seg_id, start_time, end_time, text_val, idx)
+        seg_id = seg.get('id')
+
+        if seg_id and int(seg_id) in existing_db_ids:
+            incoming_ids.add(int(seg_id))
+            cursor.execute(
+                """UPDATE v2_segments 
+                   SET channel_id = ?, json_segment_id = ?, start_time = ?, end_time = ?, text_content = ?, segment_order = ?
+                   WHERE id = ? AND media_id = ?""",
+                (channel_id, json_seg_id, start_time, end_time, text_val, idx, int(seg_id), media_id)
+            )
+        else:
+            cursor.execute(
+                """INSERT INTO v2_segments 
+                   (channel_id, media_id, json_segment_id, start_time, end_time, text_content, segment_order) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (channel_id, media_id, json_seg_id, start_time, end_time, text_val, idx)
+            )
+
+    # Delete any segments that were removed by the user
+    to_delete = existing_db_ids - incoming_ids
+    for del_id in to_delete:
+        cursor.execute("DELETE FROM v2_segments WHERE id = ? AND media_id = ?", (del_id, media_id))
+
+    # Clean up empty match groups (matches with less than 2 valid segment links)
+    cursor.execute("""
+        DELETE FROM v2_matches 
+        WHERE id IN (
+            SELECT m.id FROM v2_matches m
+            LEFT JOIN v2_match_segments ms ON m.id = ms.match_id
+            GROUP BY m.id
+            HAVING COUNT(ms.id) < 2
         )
-        
+    """)
+
     cursor.execute("UPDATE v2_media SET status = 'segmented' WHERE id = ?", (media_id,))
     conn.commit()
     conn.close()

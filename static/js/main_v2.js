@@ -1077,10 +1077,14 @@ let currentTextModalChannel = null;
  * as in the Aligner grid, allowing seamless simultaneous workflows.
  */
 function buildTextSegmentCard(seg, ch, options = {}) {
+    // Resolve the true channel belonging to this segment
+    const actualChannel = (projectV2Data && projectV2Data.channels) ?
+        (projectV2Data.channels.find(c => String(c.id) === String(seg.channel_id)) || ch) : ch;
+
     const {
         index = 1,
         showRadio = false,
-        radioName = `aligner-ch-${ch.id}`,
+        radioName = `aligner-ch-${actualChannel.id}`,
         isSelected = false,
         onSelect = null,
         showTimestamps = true
@@ -1091,7 +1095,7 @@ function buildTextSegmentCard(seg, ch, options = {}) {
     const card = document.createElement('div');
     card.className = `aligner-segment-card status-${status}`;
     card.setAttribute('data-segment-id', seg.id);
-    card.setAttribute('data-channel-id', ch.id);
+    card.setAttribute('data-channel-id', actualChannel.id);
 
     if (isSelected) {
         card.classList.add('selected-segment-card');
@@ -1130,12 +1134,52 @@ function buildTextSegmentCard(seg, ch, options = {}) {
     badgeSpan.innerText = `SEG #${seg.json_segment_id || index}`;
     leftGroup.appendChild(badgeSpan);
 
-    if (showTimestamps && seg.start_time !== undefined && seg.start_time !== null && seg.end_time !== undefined && seg.end_time !== null) {
-        const timeSpan = document.createElement('span');
-        timeSpan.style.cssText = 'font-size: 10px; color: var(--ft-ink-muted); font-family: monospace; background: white; padding: 2px 5px; border: 1px solid var(--ft-border);';
-        timeSpan.innerText = `⏱️ ${Number(seg.start_time).toFixed(1)}s - ${Number(seg.end_time).toFixed(1)}s`;
-        leftGroup.appendChild(timeSpan);
-    }
+    // Actions button placed directly next to segment identifier
+    const actionsBtn = document.createElement('button');
+    actionsBtn.type = 'button';
+    actionsBtn.title = 'Acciones de segmento';
+    actionsBtn.style.cssText = 'padding: 1px 6px; font-size: 11px; cursor: pointer; border: 1px solid var(--ft-border); background: white; font-weight: 700; color: var(--ft-ink); border-radius: 2px; line-height: 1.2; display: inline-flex; align-items: center; gap: 3px;';
+    actionsBtn.innerHTML = '⚙️ <span style="font-size: 9px;">▾</span>';
+
+    actionsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideSegActionsMenu();
+
+        const rect = actionsBtn.getBoundingClientRect();
+        const menu = document.createElement('div');
+        menu.className = 'seg-actions-menu-popup';
+        menu.style.cssText = `
+            position: fixed;
+            left: ${rect.left}px;
+            top: ${rect.bottom + 4}px;
+            z-index: 99999;
+            background: white;
+            border: 1.5px solid var(--ft-border, #1e1e1e);
+            box-shadow: 3px 3px 0px rgba(0,0,0,0.2);
+            min-width: 160px;
+            padding: 4px 0;
+            border-radius: 4px;
+        `;
+
+        const deleteItem = document.createElement('div');
+        deleteItem.style.cssText = 'padding: 8px 12px; font-size: 12px; font-weight: 700; color: #990F3D; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.1s ease;';
+        deleteItem.innerHTML = '<span>🗑️</span> <span>Eliminar segmento</span>';
+
+        deleteItem.addEventListener('mouseenter', () => deleteItem.style.background = '#fff5f5');
+        deleteItem.addEventListener('mouseleave', () => deleteItem.style.background = 'white');
+
+        deleteItem.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            hideSegActionsMenu();
+            handleDeleteSegment(seg, ch);
+        });
+
+        menu.appendChild(deleteItem);
+        document.body.appendChild(menu);
+        activeSegActionsMenu = menu;
+    });
+
+    leftGroup.appendChild(actionsBtn);
 
     segHeader.appendChild(leftGroup);
 
@@ -1152,18 +1196,473 @@ function buildTextSegmentCard(seg, ch, options = {}) {
 
     const textContentDiv = document.createElement('div');
     textContentDiv.className = 'aligner-segment-text';
-    textContentDiv.style.cssText = 'font-size: 13px; color: var(--ft-ink); line-height: 1.4; background: white; padding: 8px 10px; border: 1px solid var(--ft-border); word-break: break-word; white-space: pre-wrap;';
+    textContentDiv.style.cssText = 'font-size: 13px; color: var(--ft-ink); line-height: 1.4; background: white; padding: 8px 10px; border: 1px solid var(--ft-border); word-break: break-word; white-space: pre-wrap; cursor: text !important; user-select: text !important; -webkit-user-select: text !important;';
     textContentDiv.innerText = seg.text_content || seg.text || 'Sin texto';
+
+    // Right-click context menu for text selection to assign text to new previous/next segment
+    textContentDiv.addEventListener('contextmenu', (e) => {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed) return;
+
+        const selectedText = selection.toString();
+        if (!selectedText.trim()) return;
+
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            if (!textContentDiv.contains(range.commonAncestorContainer)) return;
+        } else {
+            return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        hideTextContextMenu();
+
+        const offsets = getSelectionCharacterOffsetWithin(textContentDiv);
+
+        showTextContextMenu(e.pageX, e.pageY, {
+            selectedText: selectedText,
+            offsets: offsets,
+            seg: seg,
+            ch: actualChannel
+        });
+    });
+
     card.appendChild(textContentDiv);
 
     if (typeof onSelect === 'function') {
         card.addEventListener('click', (e) => {
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed && textContentDiv.contains(sel.anchorNode)) {
+                return;
+            }
             onSelect(e, seg, card);
         });
     }
 
     return card;
 }
+
+let activeContextMenu = null;
+let activeSegActionsMenu = null;
+
+function hideTextContextMenu() {
+    if (activeContextMenu) {
+        activeContextMenu.remove();
+        activeContextMenu = null;
+    }
+}
+
+function hideSegActionsMenu() {
+    if (activeSegActionsMenu) {
+        activeSegActionsMenu.remove();
+        activeSegActionsMenu = null;
+    }
+}
+
+document.addEventListener('click', () => {
+    hideTextContextMenu();
+    hideSegActionsMenu();
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        hideTextContextMenu();
+        hideSegActionsMenu();
+    }
+});
+
+function getSelectionCharacterOffsetWithin(element) {
+    let start = 0;
+    let end = 0;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(element);
+        preCaretRange.setEnd(range.startContainer, range.startOffset);
+        start = preCaretRange.toString().length;
+        end = start + range.toString().length;
+    }
+    return { start, end };
+}
+
+function showTextContextMenu(x, y, data) {
+    const { selectedText, offsets, seg, ch } = data;
+
+    const menu = document.createElement('div');
+    menu.id = 'v2-text-context-menu';
+    menu.style.cssText = `
+        position: absolute;
+        top: ${y}px;
+        left: ${x}px;
+        z-index: 10000;
+        background: white;
+        border: 2px solid var(--ft-border, #1e1e1e);
+        box-shadow: 4px 4px 0px rgba(0,0,0,0.15);
+        padding: 4px 0;
+        min-width: 260px;
+        font-family: inherit;
+    `;
+
+    const itemPrev = document.createElement('div');
+    itemPrev.className = 'v2-ctx-menu-item';
+    itemPrev.style.cssText = `
+        padding: 8px 14px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--ft-ink, #1e1e1e);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: background 0.1s ease;
+    `;
+    itemPrev.innerHTML = `<span>⬆️</span> <span>Asignar a nuevo segmento previo</span>`;
+    itemPrev.addEventListener('mouseenter', () => itemPrev.style.background = '#f0fdf4');
+    itemPrev.addEventListener('mouseleave', () => itemPrev.style.background = 'white');
+
+    itemPrev.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideTextContextMenu();
+        handleTextSegmentSplit(seg, ch, selectedText, offsets, 'prev');
+    });
+
+    const itemNext = document.createElement('div');
+    itemNext.className = 'v2-ctx-menu-item';
+    itemNext.style.cssText = `
+        padding: 8px 14px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--ft-ink, #1e1e1e);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-top: 1px solid #f0f0f0;
+        transition: background 0.1s ease;
+    `;
+    itemNext.innerHTML = `<span>⬇️</span> <span>Asignar a nuevo segmento posterior</span>`;
+    itemNext.addEventListener('mouseenter', () => itemNext.style.background = '#eff6ff');
+    itemNext.addEventListener('mouseleave', () => itemNext.style.background = 'white');
+
+    itemNext.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideTextContextMenu();
+        handleTextSegmentSplit(seg, ch, selectedText, offsets, 'next');
+    });
+
+    menu.appendChild(itemPrev);
+    menu.appendChild(itemNext);
+    document.body.appendChild(menu);
+    activeContextMenu = menu;
+}
+
+function findBestMatchIndex(fullText, targetStr, approxStart) {
+    if (!fullText || !targetStr) return null;
+
+    let searchStr = targetStr;
+    let pos = fullText.indexOf(searchStr);
+
+    if (pos === -1 && targetStr.trim()) {
+        searchStr = targetStr.trim();
+        pos = fullText.indexOf(searchStr);
+    }
+
+    if (pos === -1) return null;
+
+    const indices = [];
+    while (pos !== -1) {
+        indices.push({ index: pos, length: searchStr.length });
+        pos = fullText.indexOf(searchStr, pos + 1);
+    }
+
+    if (indices.length === 1) {
+        return indices[0];
+    }
+
+    let best = indices[0];
+    let minDiff = Math.abs(indices[0].index - (approxStart || 0));
+    for (let i = 1; i < indices.length; i++) {
+        const diff = Math.abs(indices[i].index - (approxStart || 0));
+        if (diff < minDiff) {
+            minDiff = diff;
+            best = indices[i];
+        }
+    }
+    return best;
+}
+
+async function handleTextSegmentSplit(seg, ch, selectedText, offsets, direction) {
+    if (!projectV2Data || !projectV2Data.channels) return;
+
+    let targetChannel = null;
+    let targetMedia = null;
+
+    // First attempt to match using segment's own channel_id or media_id
+    const candidateChannelId = seg.channel_id || (ch ? ch.id : null);
+    const passedChObj = projectV2Data.channels.find(c => String(c.id) === String(candidateChannelId));
+    if (passedChObj && passedChObj.media) {
+        if (seg.media_id) {
+            targetMedia = passedChObj.media.find(m => String(m.id) === String(seg.media_id));
+        }
+        if (!targetMedia) {
+            targetMedia = passedChObj.media.find(m => m.segments && m.segments.some(s => String(s.id) === String(seg.id)));
+        }
+        if (targetMedia) {
+            targetChannel = passedChObj;
+        }
+    }
+
+    // Fallback: search across all channels to find which channel and media own this segment
+    if (!targetMedia) {
+        for (const c of (projectV2Data.channels || [])) {
+            if (!c.media) continue;
+            for (const m of c.media) {
+                if (seg.media_id && String(m.id) === String(seg.media_id)) {
+                    targetMedia = m;
+                    targetChannel = c;
+                    break;
+                }
+                if (m.segments && m.segments.some(s => String(s.id) === String(seg.id))) {
+                    targetMedia = m;
+                    targetChannel = c;
+                    break;
+                }
+            }
+            if (targetMedia) break;
+        }
+    }
+
+    if (!targetMedia || !targetChannel) {
+        alert('No se pudo encontrar el medio o canal correspondiente a este segmento.');
+        return;
+    }
+
+    const currentSegments = targetMedia.segments || [];
+    const segIdx = currentSegments.findIndex(s => String(s.id) === String(seg.id));
+    if (segIdx === -1) {
+        alert('No se encontró el segmento en el medio de destino.');
+        return;
+    }
+
+    const rawFullText = currentSegments[segIdx].text_content !== undefined ? currentSegments[segIdx].text_content : (currentSegments[segIdx].text || '');
+    const cleanFullText = rawFullText.replace(/\u00a0/g, ' ');
+    const cleanSelectedText = selectedText.replace(/\u00a0/g, ' ').trim();
+
+    let match = findBestMatchIndex(cleanFullText, cleanSelectedText, offsets ? offsets.start : 0);
+
+    let remainingText = cleanFullText;
+    if (match && match.index !== -1) {
+        remainingText = cleanFullText.slice(0, match.index) + cleanFullText.slice(match.index + match.length);
+    } else if (offsets && offsets.end > offsets.start) {
+        remainingText = cleanFullText.slice(0, offsets.start) + cleanFullText.slice(offsets.end);
+    } else {
+        const fallbackPos = cleanFullText.indexOf(cleanSelectedText);
+        if (fallbackPos !== -1) {
+            remainingText = cleanFullText.slice(0, fallbackPos) + cleanFullText.slice(fallbackPos + cleanSelectedText.length);
+        }
+    }
+
+    remainingText = remainingText.replace(/[ \t]+/g, ' ').trim();
+
+    const newSegText = cleanSelectedText;
+    const newSegObj = {
+        start: currentSegments[segIdx].start_time || currentSegments[segIdx].start || 0,
+        end: currentSegments[segIdx].end_time || currentSegments[segIdx].end || 0,
+        text: newSegText,
+        text_content: newSegText
+    };
+
+    currentSegments[segIdx].text_content = remainingText;
+    currentSegments[segIdx].text = remainingText;
+
+    if (direction === 'prev') {
+        currentSegments.splice(segIdx, 0, newSegObj);
+    } else {
+        currentSegments.splice(segIdx + 1, 0, newSegObj);
+    }
+
+    const segmentsPayload = currentSegments.map((s, idx) => ({
+        id: s.id || null,
+        start: Number(s.start_time !== undefined ? s.start_time : (s.start || 0)),
+        end: Number(s.end_time !== undefined ? s.end_time : (s.end || 0)),
+        text: (s.text_content !== undefined ? s.text_content : (s.text || '')).trim(),
+        json_segment_id: idx + 1
+    }));
+
+    try {
+        const response = await fetch(`/api/v2/media/${targetMedia.id}/save_segments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                channel_id: targetChannel.id,
+                segments: segmentsPayload
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            await refreshV2Data();
+
+            const alignerView = document.getElementById('v2-aligner-view');
+            if (alignerView && alignerView.style.display !== 'none') {
+                renderAlignerContainer();
+            }
+
+            if (currentTextModalMedia && String(currentTextModalMedia.id) === String(targetMedia.id)) {
+                let updatedMed = null;
+                for (const channel of (projectV2Data.channels || [])) {
+                    if (channel.media) {
+                        const found = channel.media.find(m => String(m.id) === String(targetMedia.id));
+                        if (found) { updatedMed = found; break; }
+                    }
+                }
+                if (updatedMed) {
+                    openTextSegmentationModal(updatedMed, targetChannel);
+                }
+            }
+        } else {
+            alert('Error al re-segmentar texto: ' + (data.error || ''));
+        }
+    } catch (err) {
+        alert('Error en la solicitud: ' + err.message);
+    }
+}
+
+async function handleDeleteSegment(seg, ch) {
+    if (!confirm('¿Estás seguro de que deseas eliminar este segmento?')) return;
+
+    if (!projectV2Data || !projectV2Data.channels) return;
+
+    let targetChannel = null;
+    let targetMedia = null;
+
+    const candidateChannelId = seg.channel_id || (ch ? ch.id : null);
+    const passedChObj = projectV2Data.channels.find(c => String(c.id) === String(candidateChannelId));
+    if (passedChObj && passedChObj.media) {
+        if (seg.media_id) {
+            targetMedia = passedChObj.media.find(m => String(m.id) === String(seg.media_id));
+        }
+        if (!targetMedia) {
+            targetMedia = passedChObj.media.find(m => m.segments && m.segments.some(s => String(s.id) === String(seg.id)));
+        }
+        if (targetMedia) {
+            targetChannel = passedChObj;
+        }
+    }
+
+    if (!targetMedia) {
+        for (const c of (projectV2Data.channels || [])) {
+            if (!c.media) continue;
+            for (const m of c.media) {
+                if (seg.media_id && String(m.id) === String(seg.media_id)) {
+                    targetMedia = m;
+                    targetChannel = c;
+                    break;
+                }
+                if (m.segments && m.segments.some(s => String(s.id) === String(seg.id))) {
+                    targetMedia = m;
+                    targetChannel = c;
+                    break;
+                }
+            }
+            if (targetMedia) break;
+        }
+    }
+
+    if (!targetMedia || !targetChannel) return;
+
+    const currentSegments = targetMedia.segments || [];
+    const segIdx = currentSegments.findIndex(s => String(s.id) === String(seg.id));
+    if (segIdx === -1) return;
+
+    currentSegments.splice(segIdx, 1);
+
+    const segmentsPayload = currentSegments.map((s, idx) => ({
+        id: s.id || null,
+        start: Number(s.start_time !== undefined ? s.start_time : (s.start || 0)),
+        end: Number(s.end_time !== undefined ? s.end_time : (s.end || 0)),
+        text: (s.text_content !== undefined ? s.text_content : (s.text || '')).trim(),
+        json_segment_id: idx + 1
+    }));
+
+    try {
+        const response = await fetch(`/api/v2/media/${targetMedia.id}/save_segments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                channel_id: targetChannel.id,
+                segments: segmentsPayload
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            await refreshV2Data();
+
+            const alignerView = document.getElementById('v2-aligner-view');
+            if (alignerView && alignerView.style.display !== 'none') {
+                renderAlignerContainer();
+            }
+
+            if (currentTextModalMedia && String(currentTextModalMedia.id) === String(targetMedia.id)) {
+                let updatedMed = null;
+                for (const channel of (projectV2Data.channels || [])) {
+                    if (channel.media) {
+                        const found = channel.media.find(m => String(m.id) === String(targetMedia.id));
+                        if (found) { updatedMed = found; break; }
+                    }
+                }
+                if (updatedMed) {
+                    openTextSegmentationModal(updatedMed, targetChannel);
+                }
+            }
+        } else {
+            alert('Error al eliminar segmento: ' + (data.error || ''));
+        }
+    } catch (err) {
+        alert('Error en la solicitud: ' + err.message);
+    }
+}
+
+async function handleDeleteAllSegmentation(med, ch) {
+    if (!confirm('¿Estás seguro de que deseas eliminar la segmentación y volver a cargar el texto original del archivo?\n\nEsta acción descartará todos los segmentos actuales y restaurará el contenido del archivo original.')) return;
+
+    try {
+        const response = await fetch(`/api/v2/media/${med.id}/reset_segmentation`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channel_id: ch.id })
+        });
+        const data = await response.json();
+        if (data.success) {
+            await refreshV2Data();
+
+            const alignerView = document.getElementById('v2-aligner-view');
+            if (alignerView && alignerView.style.display !== 'none') {
+                renderAlignerContainer();
+            }
+
+            if (currentTextModalMedia && String(currentTextModalMedia.id) === String(med.id)) {
+                let updatedMed = null;
+                for (const channel of (projectV2Data.channels || [])) {
+                    if (channel.media) {
+                        const found = channel.media.find(m => String(m.id) === String(med.id));
+                        if (found) { updatedMed = found; break; }
+                    }
+                }
+                if (updatedMed) {
+                    openTextSegmentationModal(updatedMed, ch);
+                }
+            }
+        } else {
+            alert('Error al reiniciar segmentación: ' + (data.error || ''));
+        }
+    } catch (err) {
+        alert('Error en la solicitud: ' + err.message);
+    }
+}
+
 
 function openTextSegmentationModal(med, ch, slotStatus) {
     currentTextModalMedia = med;
@@ -1202,6 +1701,47 @@ function openTextSegmentationModal(med, ch, slotStatus) {
         countBadge.innerText = `${segments.length} Segmentos`;
     }
 
+    const actionsBtn = document.getElementById('text-seg-modal-actions-btn');
+    if (actionsBtn) {
+        actionsBtn.onclick = (e) => {
+            e.stopPropagation();
+            hideSegActionsMenu();
+
+            const rect = actionsBtn.getBoundingClientRect();
+            const menu = document.createElement('div');
+            menu.className = 'seg-actions-menu-popup';
+            menu.style.cssText = `
+                position: fixed;
+                left: ${rect.left}px;
+                top: ${rect.bottom + 4}px;
+                z-index: 99999;
+                background: white;
+                border: 1.5px solid var(--ft-border, #1e1e1e);
+                box-shadow: 3px 3px 0px rgba(0,0,0,0.2);
+                min-width: 190px;
+                padding: 4px 0;
+                border-radius: 4px;
+            `;
+
+            const resetItem = document.createElement('div');
+            resetItem.style.cssText = 'padding: 8px 12px; font-size: 12px; font-weight: 700; color: #990F3D; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.1s ease;';
+            resetItem.innerHTML = '<span>🗑️</span> <span>Eliminar segmentación</span>';
+
+            resetItem.addEventListener('mouseenter', () => resetItem.style.background = '#fff5f5');
+            resetItem.addEventListener('mouseleave', () => resetItem.style.background = 'white');
+
+            resetItem.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                hideSegActionsMenu();
+                handleDeleteAllSegmentation(med, ch);
+            });
+
+            menu.appendChild(resetItem);
+            document.body.appendChild(menu);
+            activeSegActionsMenu = menu;
+        };
+    }
+
     const listContainer = document.getElementById('text-seg-list-container');
     if (listContainer) {
         listContainer.innerHTML = '';
@@ -1220,7 +1760,7 @@ function openTextSegmentationModal(med, ch, slotStatus) {
                 const card = buildTextSegmentCard(seg, ch, {
                     index: idx + 1,
                     showRadio: false,
-                    showTimestamps: true,
+                    showTimestamps: false,
                     isSelected: selectedAlignerSegments[ch.id] && String(selectedAlignerSegments[ch.id]) === String(seg.id),
                     onSelect: (e, segment, cardEl) => {
                         selectAlignerSegment(ch.id, segment.id);
@@ -1842,6 +2382,11 @@ async function refreshV2Data() {
     if (data.project && data.project.v2_data) {
         projectV2Data = data.project.v2_data;
         initV2Editor();
+
+        const alignerView = document.getElementById('v2-aligner-view');
+        if (alignerView && alignerView.style.display !== 'none') {
+            renderAlignerContainer();
+        }
     }
 }
 
@@ -2335,14 +2880,15 @@ function renderAlignerContainer() {
 
                     cell.appendChild(card);
                 } else {
-                    const card = buildTextSegmentCard(seg, ch, {
+                    const actualCh = cellData.channel || ch;
+                    const card = buildTextSegmentCard(seg, actualCh, {
                         index: rIdx + 1,
                         showRadio: true,
                         radioName: radioName,
                         isSelected: isSelected,
                         showTimestamps: false,
                         onSelect: (e, segment) => {
-                            selectAlignerSegment(ch.id, segment.id);
+                            selectAlignerSegment(actualCh.id, segment.id);
                         }
                     });
                     cell.appendChild(card);
