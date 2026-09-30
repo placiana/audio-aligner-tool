@@ -1,3 +1,63 @@
+// Configuración de auto-guardado y notificaciones de texto
+const SAVE_NOTIFICATION_DURATION_MS = 2000; // Duración del mensaje 'Cambios guardados.' (en ms)
+const AUTO_SAVE_DEBOUNCE_MS = 800; // Tiempo de inactividad tras dejar de escribir antes de guardar (en ms)
+
+let saveNotificationTimeout = null;
+
+function showSaveNotification(message = 'Cambios guardados.') {
+    let notif = document.getElementById('v2-save-notification');
+    if (!notif) {
+        notif = document.createElement('div');
+        notif.id = 'v2-save-notification';
+        document.body.appendChild(notif);
+    }
+
+    notif.innerHTML = `<span style="font-size: 14px;">✓</span> <span>${message}</span>`;
+    notif.classList.add('show');
+
+    if (saveNotificationTimeout) {
+        clearTimeout(saveNotificationTimeout);
+    }
+
+    saveNotificationTimeout = setTimeout(() => {
+        notif.classList.remove('show');
+    }, SAVE_NOTIFICATION_DURATION_MS);
+}
+
+async function autoSaveSegmentText(segmentId, newText, segObj) {
+    try {
+        const resp = await fetch('/api/v2/segment/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                segment_id: segmentId,
+                text_content: newText
+            })
+        });
+
+        const res = await resp.json();
+        if (res.success) {
+            if (segObj) {
+                segObj.text_content = newText;
+                segObj.text = newText;
+            }
+            showSaveNotification('Cambios guardados.');
+            return true;
+        } else {
+            console.error('Error auto-saving segment text:', res.error);
+        }
+    } catch (err) {
+        console.error('Error auto-saving segment text:', err);
+    }
+    return false;
+}
+
+function autoResizeTextarea(textarea) {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.max(48, textarea.scrollHeight + 2) + 'px';
+}
+
 let projectV2Data = v2InitialData || { channels: [], matches: [] };
 let selectedSegmentIds = new Set();
 let waveSurferInstances = {};
@@ -1254,32 +1314,74 @@ function buildTextSegmentCard(seg, ch, options = {}) {
     segHeader.appendChild(rightGroup);
     card.appendChild(segHeader);
 
-    const textContentDiv = document.createElement('div');
-    textContentDiv.className = 'aligner-segment-text';
-    textContentDiv.style.cssText = 'font-size: 13px; color: var(--ft-ink); line-height: 1.4; background: white; padding: 8px 10px; border: 1px solid var(--ft-border); word-break: break-word; white-space: pre-wrap; cursor: text !important; user-select: text !important; -webkit-user-select: text !important;';
-    textContentDiv.innerText = seg.text_content || seg.text || 'Sin texto';
+    const textContentInput = document.createElement('textarea');
+    textContentInput.className = 'aligner-segment-text';
+    const initialText = (seg.text_content !== undefined && seg.text_content !== null)
+        ? seg.text_content
+        : (seg.text || '');
+    textContentInput.value = initialText;
+    textContentInput.placeholder = 'Escribe el texto aquí...';
+    textContentInput.rows = 2;
+
+    let lastSavedText = initialText;
+    let autoSaveTimeout = null;
+
+    function triggerAutoSave() {
+        const currentVal = textContentInput.value;
+        if (currentVal !== lastSavedText) {
+            autoSaveSegmentText(seg.id, currentVal, seg).then(success => {
+                if (success) {
+                    lastSavedText = currentVal;
+                    // Sync other textboxes for this segment if present in the DOM
+                    document.querySelectorAll(`.aligner-segment-card[data-segment-id="${seg.id}"] .aligner-segment-text`).forEach(other => {
+                        if (other !== textContentInput && other.value !== currentVal) {
+                            other.value = currentVal;
+                            autoResizeTextarea(other);
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    textContentInput.addEventListener('input', () => {
+        autoResizeTextarea(textContentInput);
+        if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+        autoSaveTimeout = setTimeout(triggerAutoSave, AUTO_SAVE_DEBOUNCE_MS);
+    });
+
+    textContentInput.addEventListener('blur', () => {
+        if (autoSaveTimeout) {
+            clearTimeout(autoSaveTimeout);
+            autoSaveTimeout = null;
+        }
+        triggerAutoSave();
+    });
+
+    // Prevent clicking inside textarea from triggering selection toggle on card
+    textContentInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
 
     // Right-click context menu for text selection to assign text to new previous/next segment
-    textContentDiv.addEventListener('contextmenu', (e) => {
-        const selection = window.getSelection();
-        if (!selection || selection.isCollapsed) return;
+    textContentInput.addEventListener('contextmenu', (e) => {
+        const start = textContentInput.selectionStart;
+        const end = textContentInput.selectionEnd;
+        if (start === undefined || end === undefined || start === end) return;
 
-        const selectedText = selection.toString();
+        const selectedText = textContentInput.value.substring(start, end);
         if (!selectedText.trim()) return;
-
-        if (selection.rangeCount > 0) {
-            const range = selection.getRangeAt(0);
-            if (!textContentDiv.contains(range.commonAncestorContainer)) return;
-        } else {
-            return;
-        }
 
         e.preventDefault();
         e.stopPropagation();
 
         hideTextContextMenu();
 
-        const offsets = getSelectionCharacterOffsetWithin(textContentDiv);
+        // Ensure current text is synced to seg object
+        seg.text_content = textContentInput.value;
+        seg.text = textContentInput.value;
+
+        const offsets = { start: start, end: end };
 
         showTextContextMenu(e.pageX, e.pageY, {
             selectedText: selectedText,
@@ -1289,14 +1391,13 @@ function buildTextSegmentCard(seg, ch, options = {}) {
         });
     });
 
-    card.appendChild(textContentDiv);
+    card.appendChild(textContentInput);
+
+    // Initial height calculation
+    requestAnimationFrame(() => autoResizeTextarea(textContentInput));
 
     if (typeof onSelect === 'function') {
         card.addEventListener('click', (e) => {
-            const sel = window.getSelection();
-            if (sel && !sel.isCollapsed && textContentDiv.contains(sel.anchorNode)) {
-                return;
-            }
             onSelect(e, seg, card);
         });
     }
