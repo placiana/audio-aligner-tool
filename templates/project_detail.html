@@ -339,13 +339,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Hide modal on background click
+    let isMouseDownOnModal = false;
+    modal.addEventListener('mousedown', (e) => {
+        isMouseDownOnModal = (e.target === modal);
+    });
     modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
+        if (e.target === modal && isMouseDownOnModal) {
             modal.style.display = 'none';
             usernameInput.value = '';
             errorMsg.style.display = 'none';
             suggestionsContainer.style.display = 'none';
         }
+        isMouseDownOnModal = false;
     });
 
     // Close suggestions dropdown on document click

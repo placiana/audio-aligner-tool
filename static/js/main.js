@@ -1069,15 +1069,20 @@ function setupEventListeners() {
     document.getElementById('completion-review-btn')?.addEventListener('click', closeCompletionModal);
     
     // Close modals on clicking outside
+    let modalMousedownTarget = null;
+    window.addEventListener('mousedown', (e) => {
+        modalMousedownTarget = e.target;
+    });
     window.addEventListener('click', (e) => {
         const modal = document.getElementById('alignments-modal');
-        if (e.target === modal) {
+        if (e.target === modal && modalMousedownTarget === modal) {
             closeAlignmentsModal();
         }
         const compModal = document.getElementById('completion-modal');
-        if (e.target === compModal) {
+        if (e.target === compModal && modalMousedownTarget === compModal) {
             closeCompletionModal();
         }
+        modalMousedownTarget = null;
     });
 
     document.getElementById('reset-seg-btn')?.addEventListener('click', () => {

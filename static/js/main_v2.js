@@ -642,11 +642,51 @@ function setupV2EventListeners() {
 
     document.getElementById('seg-add-region-btn')?.addEventListener('click', () => {
         if (segWavesurfer && segRegionsPlugin) {
-            const currentTime = segWavesurfer.getCurrentTime() || 0;
-            const duration = segWavesurfer.getDuration() || (currentTime + 10);
-            const start = currentTime;
-            const end = Math.min(currentTime + 5, duration);
-            const count = segRegionsPlugin.getRegions().length + 1;
+            const duration = segWavesurfer.getDuration() || 0;
+            const existingRegions = segRegionsPlugin.getRegions() || [];
+            
+            let start = 0;
+            let end = 5;
+            const defaultLen = 5.0;
+
+            if (existingRegions.length === 0) {
+                start = 0;
+                end = duration > 0 ? Math.min(defaultLen, duration) : defaultLen;
+            } else {
+                const maxEnd = Math.max(...existingRegions.map(r => r.end));
+                if (duration <= 0 || maxEnd < duration - 0.05) {
+                    start = maxEnd;
+                    end = duration > 0 ? Math.min(start + defaultLen, duration) : start + defaultLen;
+                } else {
+                    // Check for available gaps between existing segments
+                    const sorted = [...existingRegions].sort((a, b) => a.start - b.start || a.end - b.end);
+                    let foundGap = false;
+
+                    if (sorted[0].start >= 0.2) {
+                        start = 0;
+                        end = Math.min(start + defaultLen, sorted[0].start);
+                        foundGap = true;
+                    } else {
+                        for (let i = 0; i < sorted.length - 1; i++) {
+                            const gapStart = sorted[i].end;
+                            const gapEnd = sorted[i + 1].start;
+                            if (gapEnd - gapStart >= 0.2) {
+                                start = gapStart;
+                                end = Math.min(start + defaultLen, gapEnd);
+                                foundGap = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!foundGap) {
+                        alert('No hay espacio disponible en el audio para añadir otra región.');
+                        return;
+                    }
+                }
+            }
+
+            const count = existingRegions.length + 1;
             segRegionsPlugin.addRegion({
                 start: start,
                 end: end,
@@ -655,7 +695,21 @@ function setupV2EventListeners() {
                 drag: true,
                 resize: true
             });
-            updateSegmentationCountBadge(segRegionsPlugin.getRegions().length);
+
+            // Re-sort and renumber regions
+            const allRegions = segRegionsPlugin.getRegions();
+            allRegions.sort((a, b) => a.start - b.start);
+            allRegions.forEach((r, idx) => {
+                if (r.setOptions) {
+                    r.setOptions({ content: `Seg #${idx + 1}` });
+                }
+            });
+
+            updateSegmentationCountBadge(allRegions.length);
+
+            try {
+                segWavesurfer.setTime(start);
+            } catch (e) {}
         }
     });
 
@@ -674,17 +728,23 @@ function setupV2EventListeners() {
         closeTextSegmentationModal();
     });
 
+    let modalMousedownTarget = null;
+    window.addEventListener('mousedown', (e) => {
+        modalMousedownTarget = e.target;
+    });
+
     window.addEventListener('click', (e) => {
         const audioModal = document.getElementById('audio-player-modal');
-        if (e.target === audioModal) closeAudioPlayerModal();
+        if (e.target === audioModal && modalMousedownTarget === audioModal) closeAudioPlayerModal();
         const segModal = document.getElementById('segmentation-modal');
-        if (e.target === segModal) closeSegmentationModal();
+        if (e.target === segModal && modalMousedownTarget === segModal) closeSegmentationModal();
         const textModal = document.getElementById('add-text-media-modal');
-        if (e.target === textModal) textModal.style.display = 'none';
+        if (e.target === textModal && modalMousedownTarget === textModal) textModal.style.display = 'none';
         const textSegModal = document.getElementById('text-segmentation-modal');
-        if (e.target === textSegModal) closeTextSegmentationModal();
+        if (e.target === textSegModal && modalMousedownTarget === textSegModal) closeTextSegmentationModal();
         const boundaryModal = document.getElementById('segment-boundary-modal');
-        if (e.target === boundaryModal) closeSegmentBoundaryModal();
+        if (e.target === boundaryModal && modalMousedownTarget === boundaryModal) closeSegmentBoundaryModal();
+        modalMousedownTarget = null;
     });
 
     // Boundary Modal Controls

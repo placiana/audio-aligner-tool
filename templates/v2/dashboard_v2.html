@@ -4,9 +4,11 @@
 
 {% block content %}
 <!-- Top Action Bar -->
-<div class="ft-card" style="display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; background: white;">
+<div class="ft-card"
+    style="display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; background: white;">
     <div>
-        <h2 style="font-family: var(--font-serif); font-size: 24px; margin: 0; color: var(--ft-ink);">Proyectos Multicanal</h2>
+        <h2 style="font-family: var(--font-serif); font-size: 24px; margin: 0; color: var(--ft-ink);">Proyectos
+            Multicanal</h2>
         <div style="font-size: 13px; color: var(--ft-ink-muted); margin-top: 4px;">
             Gestión relacional de audio, transcripción, traducción y alineación multicanal.
         </div>
@@ -28,7 +30,8 @@
         {% for p in owned_projects %}
         <div class="ft-project-item">
             <div>
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
                     <h4 class="ft-project-name">{{ p.name }}</h4>
                     <span class="ft-badge teal" data-i18n="role_owner">Propietario</span>
                 </div>
@@ -36,7 +39,8 @@
                     {{ p.description or 'Sin descripción proporcionada.' }}
                 </p>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--ft-border); padding-top: 12px; margin-top: 10px;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--ft-border); padding-top: 12px; margin-top: 10px;">
                 <span style="font-size: 11px; color: var(--ft-ink-muted); font-weight: 600;">
                     Creado: {{ p.created_at[:10] if p.created_at else '' }}
                 </span>
@@ -66,9 +70,11 @@
         {% for p in shared_projects %}
         <div class="ft-project-item" style="border-top-color: var(--ft-teal);">
             <div>
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
                     <h4 class="ft-project-name">{{ p.name }}</h4>
-                    <span class="ft-badge" style="background: var(--ft-paper-dark);">Colaborador ({{ p.user_role }})</span>
+                    <span class="ft-badge" style="background: var(--ft-paper-dark);">Colaborador ({{ p.user_role
+                        }})</span>
                 </div>
                 <div style="font-size: 11px; color: var(--ft-claret); font-weight: 700; margin-bottom: 8px;">
                     Propietario: {{ p.owner_name or 'Otro usuario' }}
@@ -77,7 +83,8 @@
                     {{ p.description or 'Sin descripción proporcionada.' }}
                 </p>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--ft-border); padding-top: 12px; margin-top: 10px;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--ft-border); padding-top: 12px; margin-top: 10px;">
                 <span style="font-size: 11px; color: var(--ft-ink-muted); font-weight: 600;">
                     Creado: {{ p.created_at[:10] if p.created_at else '' }}
                 </span>
@@ -100,7 +107,8 @@
     <div class="ft-modal-content" style="max-width: 620px;">
         <div class="ft-modal-header">
             <h2 id="modal-step-title">Nuevo Proyecto - Tipo</h2>
-            <button id="close-modal-btn" class="ft-button secondary" style="padding: 4px 8px; font-size: 12px;" type="button">✕</button>
+            <button id="close-modal-btn" class="ft-button secondary" style="padding: 4px 8px; font-size: 12px;"
+                type="button">✕</button>
         </div>
 
         <form method="post" action="/v2/project/create" id="new-project-form">
@@ -118,7 +126,8 @@
                         <div class="pt-icon">📁</div>
                         <div class="pt-info">
                             <div class="pt-title">Proyecto Vacío</div>
-                            <div class="pt-desc">Comienza sin canales predefinidos. Podrás estructurar o importar canales más adelante.</div>
+                            <div class="pt-desc">Comienza sin canales predefinidos. Podrás estructurar o importar
+                                canales más adelante.</div>
                         </div>
                     </div>
 
@@ -127,7 +136,8 @@
                         <div class="pt-icon">🎧</div>
                         <div class="pt-info">
                             <div class="pt-title">Audio + Transcripción</div>
-                            <div class="pt-desc">Inicializa 2 canales: un canal de Audio Original y un canal de Transcripción de texto.</div>
+                            <div class="pt-desc">Inicializa 2 canales: un canal de Audio Original y un canal de
+                                Transcripción de texto.</div>
                         </div>
                     </div>
 
@@ -136,7 +146,8 @@
                         <div class="pt-icon">🌐</div>
                         <div class="pt-info">
                             <div class="pt-title">Audio + Transcripción + Traducción</div>
-                            <div class="pt-desc">Inicializa 3 canales: Audio Original, Transcripción y un canal de Traducción de texto.</div>
+                            <div class="pt-desc">Inicializa 3 canales: Audio Original, Transcripción y un canal de
+                                Traducción de texto.</div>
                         </div>
                     </div>
                 </div>
@@ -156,13 +167,19 @@
 
                 <div style="display: flex; flex-direction: column; gap: 16px;">
                     <div style="display: flex; flex-direction: column; gap: 6px;">
-                        <label for="v2-name" style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Nombre del Proyecto *</label>
-                        <input type="text" id="v2-name" name="name" class="ft-input" placeholder="ej. Grabación Biblia Toba - Capítulo 1">
+                        <label for="v2-name"
+                            style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Nombre del Proyecto
+                            *</label>
+                        <input type="text" id="v2-name" name="name" class="ft-input"
+                            placeholder="ej. Grabación Biblia Toba - Capítulo 1">
                     </div>
 
                     <div style="display: flex; flex-direction: column; gap: 6px;">
-                        <label for="v2-description" style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Descripción</label>
-                        <textarea id="v2-description" name="description" class="ft-input" style="height: 90px; resize: vertical;" placeholder="ej. Alineación y traducción de múltiples canales de audio y texto"></textarea>
+                        <label for="v2-description"
+                            style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Descripción</label>
+                        <textarea id="v2-description" name="description" class="ft-input"
+                            style="height: 90px; resize: vertical;"
+                            placeholder="ej. Alineación y traducción de múltiples canales de audio y texto"></textarea>
                     </div>
                 </div>
 
@@ -208,8 +225,16 @@
             modal.style.display = 'none';
         });
 
+        let isMouseDownOnBackdrop = false;
+        window.addEventListener('mousedown', (e) => {
+            isMouseDownOnBackdrop = (e.target === modal);
+        });
+
         window.addEventListener('click', (e) => {
-            if (e.target === modal) modal.style.display = 'none';
+            if (e.target === modal && isMouseDownOnBackdrop) {
+                modal.style.display = 'none';
+            }
+            isMouseDownOnBackdrop = false;
         });
 
         typeCards.forEach(card => {
