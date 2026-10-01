@@ -342,10 +342,14 @@
                     </div>
                 </div>
 
-                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                     <button id="seg-detect-btn" class="ft-button teal" type="button" style="padding: 8px 16px;">
                         🔍 Detectar Segmentos Automáticos
                     </button>
+                    <div id="seg-detect-loading-status" style="display: none; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--ft-claret-dark);">
+                        <span class="waveform-loading-spinner" style="width: 15px; height: 15px; border-width: 2px;"></span>
+                        <span id="seg-detect-loading-text">Analizando silencios en el audio, por favor espera...</span>
+                    </div>
                 </div>
             </div>
 

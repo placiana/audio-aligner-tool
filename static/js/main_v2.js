@@ -2451,7 +2451,8 @@ function openSegmentationModal(med, ch) {
             });
             updateSegmentationCountBadge(segRegionsPlugin.getRegions().length);
         } else {
-            triggerSilenceDetection();
+            segRegionsPlugin.clearRegions();
+            updateSegmentationCountBadge(0);
         }
     });
 
@@ -2678,9 +2679,30 @@ function updateSegmentationCountBadge(count) {
 async function triggerSilenceDetection() {
     if (!currentSegmentingMedia || !segWavesurfer || !segRegionsPlugin) return;
 
-    const targetDuration = parseFloat(document.getElementById('seg-target-duration').value || '25');
-    const minSilence = parseInt(document.getElementById('seg-min-silence').value || '500');
-    const silenceThresh = parseInt(document.getElementById('seg-silence-thresh').value || '-20');
+    const targetDuration = parseFloat(document.getElementById('seg-target-duration')?.value || '25');
+    const minSilence = parseInt(document.getElementById('seg-min-silence')?.value || '500');
+    const silenceThresh = parseInt(document.getElementById('seg-silence-thresh')?.value || '-20');
+
+    const detectBtn = document.getElementById('seg-detect-btn');
+    const statusContainer = document.getElementById('seg-detect-loading-status');
+    const statusText = document.getElementById('seg-detect-loading-text');
+    const countBadge = document.getElementById('seg-modal-count-badge');
+
+    // Activar estado de carga visual
+    if (detectBtn) {
+        detectBtn.disabled = true;
+        detectBtn.style.opacity = '0.6';
+        detectBtn.innerHTML = '⏳ Detectando...';
+    }
+    if (statusContainer) {
+        statusContainer.style.display = 'inline-flex';
+    }
+    if (statusText) {
+        statusText.innerText = 'Analizando silencios en el audio con FFmpeg/PyDub...';
+    }
+    if (countBadge) {
+        countBadge.innerText = 'Detectando...';
+    }
 
     try {
         const response = await fetch('/api/detect_segments', {
@@ -2708,11 +2730,29 @@ async function triggerSilenceDetection() {
                 });
             });
             updateSegmentationCountBadge(data.segments.length);
+            if (statusText) {
+                statusText.innerText = `¡Detección completada! ${data.segments.length} segmentos creados.`;
+                setTimeout(() => {
+                    if (statusContainer) statusContainer.style.display = 'none';
+                }, 3000);
+            }
         } else {
             console.warn('Detección aviso: ', data.error);
+            if (statusText) {
+                statusText.innerText = `Aviso: ${data.error || 'No se detectaron silencios con estos parámetros.'}`;
+            }
         }
     } catch (err) {
         console.error('Error conectando a API detect_segments:', err);
+        if (statusText) {
+            statusText.innerText = 'Error al comunicarse con el servidor para detectar silencios.';
+        }
+    } finally {
+        if (detectBtn) {
+            detectBtn.disabled = false;
+            detectBtn.style.opacity = '1';
+            detectBtn.innerHTML = '🔍 Detectar Segmentos Automáticos';
+        }
     }
 }
 

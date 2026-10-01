@@ -1,6 +1,7 @@
 import os
 import json
 import shutil
+import subprocess
 import csv
 import urllib.parse
 import requests
@@ -629,6 +630,59 @@ def align(item_id):
                            project_id=project['id'],
                            user_role=project.get('user_role', 'viewer'))
 
+def ensure_web_compatible_audio(file_path):
+    """
+    Checks if an audio file has sample rates or formats that standard web browsers
+    cannot decode (e.g. sample_rate > 48kHz, 24-bit/32-bit integer PCM).
+    If incompatible, generates an optimized web-compatible MP3 (44.1kHz / 96k)
+    while preserving the original file intact on disk.
+    Returns the path to the web-compatible audio file.
+    """
+    if not os.path.exists(file_path):
+        return file_path
+
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext not in ['.wav', '.flac', '.aiff', '.aif', '.ogg', '.m4a']:
+        return file_path
+
+    cmd = [
+        'ffprobe', '-v', 'error',
+        '-select_streams', 'a:0',
+        '-show_entries', 'stream=sample_rate,codec_name,sample_fmt',
+        '-of', 'json', file_path
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+        info = json.loads(res.stdout).get('streams', [{}])[0]
+        sr = int(info.get('sample_rate', 0))
+        fmt = info.get('sample_fmt', '')
+    except Exception as e:
+        print(f"Warning: ffprobe failed on {file_path}: {e}")
+        return file_path
+
+    is_incompatible = (sr > 48000) or ('32' in fmt and 'flt' not in fmt) or ('24' in fmt)
+    if not is_incompatible:
+        return file_path
+
+    web_path = os.path.splitext(file_path)[0] + '.web.mp3'
+    if not os.path.exists(web_path) or os.path.getmtime(file_path) > os.path.getmtime(web_path):
+        try:
+            cmd_conv = [
+                'ffmpeg', '-y', '-v', 'error',
+                '-i', file_path,
+                '-ar', '44100',
+                '-ac', '1',
+                '-b:a', '96k',
+                web_path
+            ]
+            subprocess.run(cmd_conv, check=True, timeout=60)
+            print(f"Generated web-compatible audio: {web_path}")
+        except Exception as e:
+            print(f"Error converting audio to web format for {file_path}: {e}")
+            return file_path
+
+    return web_path
+
 # --- Serving Uploaded Files ---
 
 @app.route('/uploads/<path:filename>')
@@ -646,6 +700,14 @@ def uploaded_file(filename):
         if os.path.exists(sys_uploads):
             upload_folder = os.path.dirname(sys_uploads)
             filename = os.path.basename(sys_uploads)
+            target_path = sys_uploads
+
+    # Automatically detect if audio requires a web-compatible version
+    if os.path.exists(target_path):
+        web_version = ensure_web_compatible_audio(target_path)
+        if web_version != target_path and os.path.exists(web_version):
+            upload_folder = os.path.dirname(web_version)
+            filename = os.path.basename(web_version)
 
     mimetype = None
     lower_fn = filename.lower()
@@ -1392,6 +1454,11 @@ def api_v2_add_media(channel_id):
                 )
             except Exception as e:
                 print(f"Error auto-segmenting text file: {e}")
+        elif media_type == 'audio' or ext in ['.wav', '.flac', '.aiff', '.aif', '.ogg', '.m4a']:
+            try:
+                ensure_web_compatible_audio(target_path)
+            except Exception as e:
+                print(f"Error generating web-compatible audio on upload: {e}")
 
         added_items.append({'media_id': media_id, 'filename': filename})
 
