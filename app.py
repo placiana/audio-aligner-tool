@@ -635,7 +635,30 @@ def align(item_id):
 @login_required
 def uploaded_file(filename):
     # Security: check if file is within project boundaries or is a legacy file
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    upload_folder = app.config['UPLOAD_FOLDER']
+    target_path = os.path.join(upload_folder, filename)
+    if not os.path.exists(target_path) and g.user:
+        sys_uploads = os.path.join(
+            repository.get_user_repo_base(upload_folder, g.user['id']),
+            repository.SYSTEM_UPLOADS_DIR,
+            filename
+        )
+        if os.path.exists(sys_uploads):
+            upload_folder = os.path.dirname(sys_uploads)
+            filename = os.path.basename(sys_uploads)
+
+    mimetype = None
+    lower_fn = filename.lower()
+    if lower_fn.endswith('.wav'):
+        mimetype = 'audio/wav'
+    elif lower_fn.endswith('.mp3'):
+        mimetype = 'audio/mpeg'
+    elif lower_fn.endswith('.ogg'):
+        mimetype = 'audio/ogg'
+    elif lower_fn.endswith('.flac'):
+        mimetype = 'audio/flac'
+
+    return send_from_directory(upload_folder, filename, mimetype=mimetype, conditional=True)
 
 # --- Alignment & Silence Detection API ---
 

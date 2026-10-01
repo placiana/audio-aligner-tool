@@ -549,7 +549,7 @@ body {
     position: sticky;
     top: 0;
     z-index: 5;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
 }
 
 .aligner-row-cell {
@@ -691,4 +691,75 @@ body {
     border-color: var(--ft-claret);
     box-shadow: 0 2px 8px rgba(153, 15, 61, 0.15);
     background: #fffdfc;
+}
+
+/* Snap / Vinculación contigua de límites */
+.boundary-snap-toggle-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    background: #faf9f7;
+    padding: 5px 12px;
+    border: 1.5px solid var(--ft-border);
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ft-ink);
+    user-select: none;
+    transition: all 0.15s ease;
+}
+
+.boundary-snap-toggle-container:hover {
+    background: #f5f0eb;
+    border-color: var(--ft-claret);
+}
+
+.boundary-snap-toggle-container:has(#boundary-snap-toggle:checked) {
+    background: #f0fdf4 !important;
+    border-color: #86efac !important;
+    color: #166534 !important;
+}
+
+/* WaveSurfer Region Resize Handles & Visual Boundaries */
+#boundary-waveform-container ::part(region-handle),
+.wavesurfer-region ::part(region-handle) {
+    width: 10px !important;
+    opacity: 0.95;
+    cursor: col-resize !important;
+    z-index: 25 !important;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+#boundary-waveform-container ::part(region-handle-left),
+.wavesurfer-region ::part(region-handle-left) {
+    border-left: 4px solid var(--ft-claret) !important;
+    background: linear-gradient(to right, rgba(153, 15, 61, 0.35), transparent) !important;
+}
+
+#boundary-waveform-container ::part(region-handle-right),
+.wavesurfer-region ::part(region-handle-right) {
+    border-right: 4px solid var(--ft-claret) !important;
+    background: linear-gradient(to left, rgba(153, 15, 61, 0.35), transparent) !important;
+}
+
+#boundary-waveform-container ::part(region-handle):hover,
+.wavesurfer-region ::part(region-handle):hover {
+    opacity: 1 !important;
+    background-color: rgba(153, 15, 61, 0.45) !important;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.waveform-loading-spinner {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #d7cbb9;
+    border-top-color: var(--ft-claret);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
 }

@@ -385,6 +385,7 @@
                         <span style="font-size: 11px; color: var(--ft-ink-muted); font-weight: 700;">ARCHIVO:</span>
                         <strong id="boundary-modal-filename" style="margin-left: 4px; font-family: var(--font-serif); font-size: 13px;">audio.mp3</strong>
                     </div>
+                    <span id="boundary-contiguous-badge" class="ft-badge teal" style="display: none; font-size: 11px; font-weight: 700;">🔗 Contiguo</span>
                 </div>
                 
                 <!-- Live Timestamps Displays -->
@@ -438,6 +439,12 @@
                             <button id="boundary-end-plus" class="ft-button secondary" type="button" style="padding: 4px 8px; font-size: 11px;" title="Mover fin 0.1s adelante">+0.1s</button>
                         </div>
                     </div>
+
+                    <!-- Snap / Vincular contiguos toggle -->
+                    <label id="boundary-snap-label" class="boundary-snap-toggle-container" title="Si los segmentos son contiguos, mover un límite ajustará automáticamente el segmento contiguo adyacente">
+                        <input type="checkbox" id="boundary-snap-toggle" checked style="cursor: pointer; width: 15px; height: 15px; accent-color: var(--ft-claret); margin: 0;">
+                        <span>🔗 Vincular contiguos (Snap)</span>
+                    </label>
 
                     <!-- Zoom slider -->
                     <div style="display: flex; align-items: center; gap: 8px;">

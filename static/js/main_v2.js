@@ -2,6 +2,10 @@
 const SAVE_NOTIFICATION_DURATION_MS = 2000; // Duración del mensaje 'Cambios guardados.' (en ms)
 const AUTO_SAVE_DEBOUNCE_MS = 800; // Tiempo de inactividad tras dejar de escribir antes de guardar (en ms)
 
+// Configuración de ajuste fino de límites y vinculación contigua (Snap)
+const CONTIGUOUS_BOUNDARY_THRESHOLD_MS = 60; // Umbral en ms para considerar segmentos adyacentes como contiguos (configurable)
+const CONTIGUOUS_BOUNDARY_THRESHOLD_SEC = CONTIGUOUS_BOUNDARY_THRESHOLD_MS / 1000;
+
 let saveNotificationTimeout = null;
 
 function showSaveNotification(message = 'Cambios guardados.') {
@@ -846,6 +850,7 @@ function setupV2EventListeners() {
         const newStart = Math.max(0, Number((currentBoundaryRegion.start - 0.1).toFixed(3)));
         currentBoundaryRegion.setOptions({ start: newStart });
         updateBoundaryDisplays(newStart, currentBoundaryRegion.end);
+        syncContiguousBoundaries();
     });
 
     document.getElementById('boundary-start-plus')?.addEventListener('click', () => {
@@ -853,6 +858,7 @@ function setupV2EventListeners() {
         const newStart = Math.min(currentBoundaryRegion.end - 0.05, Number((currentBoundaryRegion.start + 0.1).toFixed(3)));
         currentBoundaryRegion.setOptions({ start: newStart });
         updateBoundaryDisplays(newStart, currentBoundaryRegion.end);
+        syncContiguousBoundaries();
     });
 
     document.getElementById('boundary-end-minus')?.addEventListener('click', () => {
@@ -860,6 +866,7 @@ function setupV2EventListeners() {
         const newEnd = Math.max(currentBoundaryRegion.start + 0.05, Number((currentBoundaryRegion.end - 0.1).toFixed(3)));
         currentBoundaryRegion.setOptions({ end: newEnd });
         updateBoundaryDisplays(currentBoundaryRegion.start, newEnd);
+        syncContiguousBoundaries();
     });
 
     document.getElementById('boundary-end-plus')?.addEventListener('click', () => {
@@ -868,6 +875,11 @@ function setupV2EventListeners() {
         const newEnd = Math.min(totalDur, Number((currentBoundaryRegion.end + 0.1).toFixed(3)));
         currentBoundaryRegion.setOptions({ end: newEnd });
         updateBoundaryDisplays(currentBoundaryRegion.start, newEnd);
+        syncContiguousBoundaries();
+    });
+
+    document.getElementById('boundary-snap-toggle')?.addEventListener('change', () => {
+        syncContiguousBoundaries();
     });
 
     document.getElementById('boundary-zoom-slider')?.addEventListener('input', (e) => {
@@ -876,14 +888,10 @@ function setupV2EventListeners() {
         if (label) label.innerText = `${val} px/s`;
         if (boundaryWaveSurfer) {
             boundaryWaveSurfer.zoom(val);
-            if (currentBoundaryRegion) {
-                const wrapper = document.getElementById('boundary-waveform-wrapper');
-                if (wrapper) {
-                    const centerTime = (currentBoundaryRegion.start + currentBoundaryRegion.end) / 2;
-                    const centerPx = centerTime * val;
-                    wrapper.scrollLeft = Math.max(0, centerPx - (wrapper.clientWidth / 2));
-                }
-            }
+            centerBoundaryWaveformOnSegment(val);
+            requestAnimationFrame(() => {
+                centerBoundaryWaveformOnSegment(val);
+            });
         }
     });
 
@@ -904,20 +912,67 @@ function setupV2EventListeners() {
         }
 
         try {
-            const resp = await fetch('/api/v2/segment/update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    segment_id: currentBoundarySegment.id,
-                    start_time: startSec,
-                    end_time: endSec
-                })
-            });
+            const snapToggle = document.getElementById('boundary-snap-toggle');
+            const isSnapEnabled = snapToggle ? snapToggle.checked : true;
 
-            const res = await resp.json();
-            if (res.success) {
+            const savePromises = [
+                fetch('/api/v2/segment/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        segment_id: currentBoundarySegment.id,
+                        start_time: startSec,
+                        end_time: endSec
+                    })
+                })
+            ];
+
+            let savingPrev = false;
+            if (isSnapEnabled && isBoundaryPrevContiguous && currentBoundaryPrevSeg && modifiedPrevEnd !== null && modifiedPrevEnd !== Number(currentBoundaryPrevSeg.end_time)) {
+                savingPrev = true;
+                savePromises.push(
+                    fetch('/api/v2/segment/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            segment_id: currentBoundaryPrevSeg.id,
+                            start_time: Number(currentBoundaryPrevSeg.start_time),
+                            end_time: modifiedPrevEnd
+                        })
+                    })
+                );
+            }
+
+            let savingNext = false;
+            if (isSnapEnabled && isBoundaryNextContiguous && currentBoundaryNextSeg && modifiedNextStart !== null && modifiedNextStart !== Number(currentBoundaryNextSeg.start_time)) {
+                savingNext = true;
+                savePromises.push(
+                    fetch('/api/v2/segment/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            segment_id: currentBoundaryNextSeg.id,
+                            start_time: modifiedNextStart,
+                            end_time: Number(currentBoundaryNextSeg.end_time)
+                        })
+                    })
+                );
+            }
+
+            const responses = await Promise.all(savePromises);
+            const results = await Promise.all(responses.map(r => r.json()));
+            const allSuccess = results.every(res => res && res.success);
+
+            if (allSuccess) {
                 currentBoundarySegment.start_time = startSec;
                 currentBoundarySegment.end_time = endSec;
+
+                if (savingPrev && currentBoundaryPrevSeg) {
+                    currentBoundaryPrevSeg.end_time = modifiedPrevEnd;
+                }
+                if (savingNext && currentBoundaryNextSeg) {
+                    currentBoundaryNextSeg.start_time = modifiedNextStart;
+                }
 
                 if (projectV2Data && projectV2Data.channels) {
                     projectV2Data.channels.forEach(channel => {
@@ -927,6 +982,12 @@ function setupV2EventListeners() {
                                     s.start_time = startSec;
                                     s.end_time = endSec;
                                 }
+                                if (savingPrev && currentBoundaryPrevSeg && String(s.id) === String(currentBoundaryPrevSeg.id)) {
+                                    s.end_time = modifiedPrevEnd;
+                                }
+                                if (savingNext && currentBoundaryNextSeg && String(s.id) === String(currentBoundaryNextSeg.id)) {
+                                    s.start_time = modifiedNextStart;
+                                }
                             });
                         });
                     });
@@ -935,8 +996,9 @@ function setupV2EventListeners() {
                 await refreshV2Data();
                 closeSegmentBoundaryModal();
                 renderAlignerContainer();
+                showSaveNotification('Límites guardados.');
             } else {
-                alert('Error al guardar segmento: ' + (res.error || 'Error desconocido'));
+                alert('Error al guardar límites de segmento.');
             }
         } catch (err) {
             console.error('Error saving segment boundaries:', err);
@@ -1117,6 +1179,103 @@ let currentBoundarySegment = null;
 let currentBoundaryMedia = null;
 let currentBoundaryChannel = null;
 let isBoundaryRegionPlaying = false;
+let currentBoundaryPrevSeg = null;
+let currentBoundaryNextSeg = null;
+let currentBoundaryPrevRegion = null;
+let currentBoundaryNextRegion = null;
+let isBoundaryPrevContiguous = false;
+let isBoundaryNextContiguous = false;
+let modifiedPrevEnd = null;
+let modifiedNextStart = null;
+
+function syncContiguousBoundaries() {
+    const snapToggle = document.getElementById('boundary-snap-toggle');
+    const isSnapEnabled = snapToggle ? snapToggle.checked : true;
+    if (!isSnapEnabled || !currentBoundaryRegion) return;
+
+    const currentStart = Number(currentBoundaryRegion.start.toFixed(3));
+    const currentEnd = Number(currentBoundaryRegion.end.toFixed(3));
+
+    // 1. Acompañar el segmento previo contiguo si se mueve el inicio del actual
+    if (isBoundaryPrevContiguous && currentBoundaryPrevSeg && currentBoundaryPrevRegion) {
+        const prevStart = Number(currentBoundaryPrevSeg.start_time);
+        const newPrevEnd = Math.max(prevStart + 0.05, currentStart);
+        modifiedPrevEnd = Number(newPrevEnd.toFixed(3));
+        currentBoundaryPrevRegion.setOptions({
+            end: modifiedPrevEnd
+        });
+    }
+
+    // 2. Acompañar el segmento siguiente contiguo si se mueve el fin del actual
+    if (isBoundaryNextContiguous && currentBoundaryNextSeg && currentBoundaryNextRegion) {
+        const nextEnd = Number(currentBoundaryNextSeg.end_time);
+        const newNextStart = Math.min(nextEnd - 0.05, currentEnd);
+        modifiedNextStart = Number(newNextStart.toFixed(3));
+        currentBoundaryNextRegion.setOptions({
+            start: modifiedNextStart
+        });
+    }
+}
+
+function centerBoundaryWaveformOnSegment(pxPerSec) {
+    if (!boundaryWaveSurfer || !currentBoundarySegment) return;
+    const seg = currentBoundarySegment;
+    const segStart = (currentBoundaryRegion ? currentBoundaryRegion.start : Number(seg.start_time)) || 0;
+    const segEnd = (currentBoundaryRegion ? currentBoundaryRegion.end : Number(seg.end_time)) || (segStart + 5);
+    const centerTime = (segStart + segEnd) / 2;
+
+    const scrollContainer = boundaryWaveSurfer.renderer?.scrollContainer ||
+                            document.querySelector('#boundary-waveform-container div[style*="overflow"]') ||
+                            document.querySelector('#boundary-waveform-container [part="scroll"]') ||
+                            document.querySelector('#boundary-waveform-container > div');
+    const wrapper = document.getElementById('boundary-waveform-wrapper');
+
+    const clientWidth = (scrollContainer && scrollContainer.clientWidth > 50) 
+        ? scrollContainer.clientWidth 
+        : (wrapper?.clientWidth || 850);
+        
+    const duration = boundaryWaveSurfer.getDuration() || 0;
+    const scrollWidth = scrollContainer ? scrollContainer.scrollWidth : 0;
+
+    let centerPx = 0;
+    const currentPxPerSec = pxPerSec || (scrollWidth > clientWidth && duration > 0 ? (scrollWidth / duration) : 70);
+
+    if (scrollWidth > clientWidth && duration > 0) {
+        centerPx = centerTime * (scrollWidth / duration);
+    } else {
+        centerPx = centerTime * currentPxPerSec;
+    }
+
+    const targetScroll = Math.max(0, Math.round(centerPx - (clientWidth / 2)));
+
+    // 1. Scroll WaveSurfer's internal scroll container directly
+    if (scrollContainer) {
+        scrollContainer.scrollLeft = targetScroll;
+    }
+
+    // 2. WaveSurfer API setScroll
+    if (typeof boundaryWaveSurfer.setScroll === 'function') {
+        try {
+            boundaryWaveSurfer.setScroll(targetScroll);
+        } catch (e) {}
+    }
+
+    // 3. Fallback setScrollPercentage
+    if (duration > 0 && typeof boundaryWaveSurfer.setScrollPercentage === 'function') {
+        const totalW = scrollWidth || (duration * currentPxPerSec);
+        if (totalW > clientWidth) {
+            const ratio = targetScroll / totalW;
+            try {
+                boundaryWaveSurfer.setScrollPercentage(Math.max(0, Math.min(1, ratio)));
+            } catch (e) {}
+        }
+    }
+
+    // 4. Fallback on outer wrapper if it has overflow
+    if (wrapper && wrapper.scrollWidth > wrapper.clientWidth) {
+        wrapper.scrollLeft = targetScroll;
+    }
+}
 
 function openAudioPlayerModal(med, ch, slotStatus) {
     currentAudioModalMedia = med;
@@ -1148,7 +1307,20 @@ function openAudioPlayerModal(med, ch, slotStatus) {
 
     const containerId = 'audio-modal-waveform-container';
     const container = document.getElementById(containerId);
-    if (container) container.innerHTML = '';
+    if (container) {
+        container.innerHTML = `
+            <div id="audio-modal-loading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; color: var(--ft-ink-muted); gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px;">
+                    <span class="waveform-loading-spinner"></span>
+                    <span id="audio-modal-loading-text">Cargando audio... <strong id="audio-modal-loading-progress" style="color: var(--ft-claret);">0%</strong></span>
+                </div>
+                <div id="audio-modal-loading-bar-bg" style="width: 220px; height: 6px; background: #e5e0d8; border-radius: 3px; overflow: hidden;">
+                    <div id="audio-modal-loading-bar-fill" style="width: 0%; height: 100%; background: var(--ft-claret); transition: width 0.15s ease;"></div>
+                </div>
+            </div>
+            <div id="audio-modal-waveform-target" style="display: none; width: 100%;"></div>
+        `;
+    }
 
     if (modalWavesurfer) {
         try { modalWavesurfer.destroy(); } catch (e) {}
@@ -1157,9 +1329,15 @@ function openAudioPlayerModal(med, ch, slotStatus) {
 
     modal.style.display = 'flex';
 
+    const playBtn = document.getElementById('audio-modal-play-btn');
+    if (playBtn) {
+        playBtn.disabled = true;
+        playBtn.innerHTML = '⏳ Cargando...';
+    }
+
     const audioUrl = `/uploads/${med.filename}`;
     modalWavesurfer = WaveSurfer.create({
-        container: `#${containerId}`,
+        container: '#audio-modal-waveform-target',
         waveColor: '#d7cbb9',
         progressColor: '#990F3D',
         height: 100,
@@ -1167,7 +1345,58 @@ function openAudioPlayerModal(med, ch, slotStatus) {
         url: audioUrl
     });
 
-    const playBtn = document.getElementById('audio-modal-play-btn');
+    modalWavesurfer.on('loading', (percent) => {
+        const progEl = document.getElementById('audio-modal-loading-progress');
+        if (progEl) progEl.innerText = `${percent}%`;
+        const barFill = document.getElementById('audio-modal-loading-bar-fill');
+        if (barFill) barFill.style.width = `${percent}%`;
+    });
+
+    modalWavesurfer.on('decode', () => {
+        const textEl = document.getElementById('audio-modal-loading-text');
+        if (textEl) textEl.innerHTML = 'Decodificando forma de onda...';
+    });
+
+    modalWavesurfer.on('ready', () => {
+        const loadingEl = document.getElementById('audio-modal-loading');
+        if (loadingEl) loadingEl.style.display = 'none';
+        const targetEl = document.getElementById('audio-modal-waveform-target');
+        if (targetEl) targetEl.style.display = 'block';
+        if (playBtn) {
+            playBtn.disabled = false;
+            playBtn.innerHTML = '▶ Reproducir';
+        }
+    });
+
+    modalWavesurfer.on('error', (err) => {
+        console.error('Error cargando audio en modalWavesurfer:', err);
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; color: #991b1b; background: #fee2e2; border: 1.5px solid #f87171; padding: 12px; border-radius: 4px; gap: 6px; font-size: 12px; text-align: center;">
+                    <strong>⚠️ Error al procesar el archivo de audio</strong>
+                    <span>No se pudo decodificar "${med.filename}". El navegador puede tener dificultades con archivos de alta frecuencia (como 96kHz PCM).</span>
+                </div>
+            `;
+        }
+        if (playBtn) {
+            playBtn.disabled = true;
+            playBtn.innerHTML = '❌ Error';
+        }
+    });
+
+    modalWavesurfer.on('play', () => {
+        if (playBtn) playBtn.innerHTML = '⏸ Pausar';
+    });
+
+    modalWavesurfer.on('pause', () => {
+        if (playBtn) playBtn.innerHTML = '▶ Reproducir';
+    });
+
+    modalWavesurfer.on('finish', () => {
+        if (playBtn) playBtn.innerHTML = '▶ Reproducir';
+    });
+
     if (playBtn) {
         playBtn.onclick = () => {
             if (modalWavesurfer) modalWavesurfer.playPause();
@@ -1268,18 +1497,53 @@ function buildTextSegmentCard(seg, ch, options = {}) {
         const rect = actionsBtn.getBoundingClientRect();
         const menu = document.createElement('div');
         menu.className = 'seg-actions-menu-popup';
+        
+        let topPos = rect.bottom + 4;
+        if (topPos + 150 > window.innerHeight) {
+            topPos = Math.max(10, rect.top - 140);
+        }
+        let leftPos = rect.left;
+        if (leftPos + 210 > window.innerWidth) {
+            leftPos = Math.max(10, window.innerWidth - 220);
+        }
+
         menu.style.cssText = `
             position: fixed;
-            left: ${rect.left}px;
-            top: ${rect.bottom + 4}px;
+            left: ${leftPos}px;
+            top: ${topPos}px;
             z-index: 99999;
             background: white;
             border: 1.5px solid var(--ft-border, #1e1e1e);
             box-shadow: 3px 3px 0px rgba(0,0,0,0.2);
-            min-width: 160px;
+            min-width: 200px;
             padding: 4px 0;
             border-radius: 4px;
         `;
+
+        const addBeforeItem = document.createElement('div');
+        addBeforeItem.style.cssText = 'padding: 8px 12px; font-size: 12px; font-weight: 700; color: var(--ft-ink, #1e1e1e); cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.1s ease;';
+        addBeforeItem.innerHTML = '<span>⬆️</span> <span>Agregar segmento antes</span>';
+        addBeforeItem.addEventListener('mouseenter', () => addBeforeItem.style.background = '#f0fdf4');
+        addBeforeItem.addEventListener('mouseleave', () => addBeforeItem.style.background = 'white');
+        addBeforeItem.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            hideSegActionsMenu();
+            handleInsertEmptySegment(seg, actualChannel, 'before');
+        });
+
+        const addAfterItem = document.createElement('div');
+        addAfterItem.style.cssText = 'padding: 8px 12px; font-size: 12px; font-weight: 700; color: var(--ft-ink, #1e1e1e); cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.1s ease;';
+        addAfterItem.innerHTML = '<span>⬇️</span> <span>Agregar segmento después</span>';
+        addAfterItem.addEventListener('mouseenter', () => addAfterItem.style.background = '#f0fdf4');
+        addAfterItem.addEventListener('mouseleave', () => addAfterItem.style.background = 'white');
+        addAfterItem.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            hideSegActionsMenu();
+            handleInsertEmptySegment(seg, actualChannel, 'after');
+        });
+
+        const divider = document.createElement('div');
+        divider.style.cssText = 'border-top: 1px solid #e2e8f0; margin: 4px 0;';
 
         const deleteItem = document.createElement('div');
         deleteItem.style.cssText = 'padding: 8px 12px; font-size: 12px; font-weight: 700; color: #990F3D; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.1s ease;';
@@ -1291,9 +1555,12 @@ function buildTextSegmentCard(seg, ch, options = {}) {
         deleteItem.addEventListener('click', (ev) => {
             ev.stopPropagation();
             hideSegActionsMenu();
-            handleDeleteSegment(seg, ch);
+            handleDeleteSegment(seg, actualChannel);
         });
 
+        menu.appendChild(addBeforeItem);
+        menu.appendChild(addAfterItem);
+        menu.appendChild(divider);
         menu.appendChild(deleteItem);
         document.body.appendChild(menu);
         activeSegActionsMenu = menu;
@@ -1691,6 +1958,145 @@ async function handleTextSegmentSplit(seg, ch, selectedText, offsets, direction)
     }
 }
 
+async function handleInsertEmptySegment(seg, ch, position = 'after') {
+    if (!projectV2Data || !projectV2Data.channels) return;
+
+    let targetChannel = null;
+    let targetMedia = null;
+
+    const candidateChannelId = seg.channel_id || (ch ? ch.id : null);
+    const passedChObj = projectV2Data.channels.find(c => String(c.id) === String(candidateChannelId));
+    if (passedChObj && passedChObj.media) {
+        if (seg.media_id) {
+            targetMedia = passedChObj.media.find(m => String(m.id) === String(seg.media_id));
+        }
+        if (!targetMedia) {
+            targetMedia = passedChObj.media.find(m => m.segments && m.segments.some(s => String(s.id) === String(seg.id)));
+        }
+        if (targetMedia) {
+            targetChannel = passedChObj;
+        }
+    }
+
+    if (!targetMedia) {
+        for (const c of (projectV2Data.channels || [])) {
+            if (!c.media) continue;
+            for (const m of c.media) {
+                if (seg.media_id && String(m.id) === String(seg.media_id)) {
+                    targetMedia = m;
+                    targetChannel = c;
+                    break;
+                }
+                if (m.segments && m.segments.some(s => String(s.id) === String(seg.id))) {
+                    targetMedia = m;
+                    targetChannel = c;
+                    break;
+                }
+            }
+            if (targetMedia) break;
+        }
+    }
+
+    if (!targetMedia || !targetChannel) {
+        alert('No se pudo encontrar el medio o canal correspondiente a este segmento.');
+        return;
+    }
+
+    const currentSegments = targetMedia.segments || [];
+    const segIdx = currentSegments.findIndex(s => String(s.id) === String(seg.id));
+    if (segIdx === -1) {
+        alert('No se encontró el segmento en el medio de destino.');
+        return;
+    }
+
+    // Sync any current values from DOM inputs before saving
+    document.querySelectorAll(`.aligner-segment-card[data-channel-id="${targetChannel.id}"]`).forEach(cEl => {
+        const sId = cEl.getAttribute('data-segment-id');
+        const txtInput = cEl.querySelector('.aligner-segment-text');
+        if (sId && txtInput) {
+            const foundSeg = currentSegments.find(s => String(s.id) === String(sId));
+            if (foundSeg) {
+                foundSeg.text_content = txtInput.value;
+                foundSeg.text = txtInput.value;
+            }
+        }
+    });
+
+    const newSegObj = {
+        id: null,
+        start: 0,
+        end: 0,
+        text: '',
+        text_content: ''
+    };
+
+    const insertIdx = (position === 'before') ? segIdx : (segIdx + 1);
+    currentSegments.splice(insertIdx, 0, newSegObj);
+
+    const segmentsPayload = currentSegments.map((s, idx) => ({
+        id: s.id || null,
+        start: Number(s.start_time !== undefined ? s.start_time : (s.start || 0)),
+        end: Number(s.end_time !== undefined ? s.end_time : (s.end || 0)),
+        text: s.text_content !== undefined && s.text_content !== null ? s.text_content : (s.text || ''),
+        json_segment_id: idx + 1
+    }));
+
+    try {
+        const response = await fetch(`/api/v2/media/${targetMedia.id}/save_segments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                channel_id: targetChannel.id,
+                segments: segmentsPayload
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            await refreshV2Data();
+
+            const alignerView = document.getElementById('v2-aligner-view');
+            if (alignerView && alignerView.style.display !== 'none') {
+                renderAlignerContainer();
+            }
+
+            if (currentTextModalMedia && String(currentTextModalMedia.id) === String(targetMedia.id)) {
+                let updatedMed = null;
+                for (const channel of (projectV2Data.channels || [])) {
+                    if (channel.media) {
+                        const found = channel.media.find(m => String(m.id) === String(targetMedia.id));
+                        if (found) { updatedMed = found; break; }
+                    }
+                }
+                if (updatedMed) {
+                    openTextSegmentationModal(updatedMed, targetChannel);
+                }
+            }
+
+            showSaveNotification('Segmento agregado.');
+
+            // Focus newly inserted empty textbox
+            setTimeout(() => {
+                let refreshedMedia = null;
+                const chObj = (projectV2Data.channels || []).find(c => String(c.id) === String(targetChannel.id));
+                if (chObj && chObj.media) {
+                    refreshedMedia = chObj.media.find(m => String(m.id) === String(targetMedia.id));
+                }
+                if (refreshedMedia && refreshedMedia.segments && refreshedMedia.segments[insertIdx]) {
+                    const createdSegId = refreshedMedia.segments[insertIdx].id;
+                    const newEl = document.querySelector(`.aligner-segment-card[data-segment-id="${createdSegId}"] .aligner-segment-text`);
+                    if (newEl) {
+                        newEl.focus();
+                    }
+                }
+            }, 60);
+        } else {
+            alert('Error al agregar segmento: ' + (data.error || ''));
+        }
+    } catch (err) {
+        alert('Error en la solicitud: ' + err.message);
+    }
+}
+
 async function handleDeleteSegment(seg, ch) {
     if (!confirm('¿Estás seguro de que deseas eliminar este segmento?')) return;
 
@@ -1957,7 +2363,20 @@ function openSegmentationModal(med, ch) {
 
     const containerId = 'seg-waveform-container';
     const container = document.getElementById(containerId);
-    if (container) container.innerHTML = '';
+    if (container) {
+        container.innerHTML = `
+            <div id="seg-modal-loading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 120px; color: var(--ft-ink-muted); gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px;">
+                    <span class="waveform-loading-spinner"></span>
+                    <span id="seg-modal-loading-text">Cargando audio... <strong id="seg-modal-loading-progress" style="color: var(--ft-claret);">0%</strong></span>
+                </div>
+                <div id="seg-modal-loading-bar-bg" style="width: 220px; height: 6px; background: #e5e0d8; border-radius: 3px; overflow: hidden;">
+                    <div id="seg-modal-loading-bar-fill" style="width: 0%; height: 100%; background: var(--ft-claret); transition: width 0.15s ease;"></div>
+                </div>
+            </div>
+            <div id="seg-modal-waveform-target" style="display: none; width: 100%;"></div>
+        `;
+    }
 
     if (segWavesurfer) {
         try { segWavesurfer.destroy(); } catch (e) {}
@@ -1972,7 +2391,7 @@ function openSegmentationModal(med, ch) {
     segRegionsPlugin = WaveSurfer.Regions.create();
 
     segWavesurfer = WaveSurfer.create({
-        container: `#${containerId}`,
+        container: '#seg-modal-waveform-target',
         waveColor: '#d7cbb9',
         progressColor: '#990F3D',
         height: 120,
@@ -1981,7 +2400,36 @@ function openSegmentationModal(med, ch) {
         plugins: [segRegionsPlugin]
     });
 
+    segWavesurfer.on('loading', (percent) => {
+        const progEl = document.getElementById('seg-modal-loading-progress');
+        if (progEl) progEl.innerText = `${percent}%`;
+        const barFill = document.getElementById('seg-modal-loading-bar-fill');
+        if (barFill) barFill.style.width = `${percent}%`;
+    });
+
+    segWavesurfer.on('decode', () => {
+        const textEl = document.getElementById('seg-modal-loading-text');
+        if (textEl) textEl.innerHTML = 'Decodificando forma de onda...';
+    });
+
+    segWavesurfer.on('error', (err) => {
+        console.error('Error cargando audio en segWavesurfer:', err);
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 120px; color: #991b1b; background: #fee2e2; border: 1.5px solid #f87171; padding: 12px; border-radius: 4px; gap: 6px; font-size: 12px; text-align: center;">
+                    <strong>⚠️ Error al procesar el archivo de audio</strong>
+                    <span>No se pudo decodificar "${med.filename}". El navegador puede tener dificultades con archivos de alta frecuencia (como 96kHz PCM).</span>
+                </div>
+            `;
+        }
+    });
+
     segWavesurfer.on('ready', () => {
+        const loadingEl = document.getElementById('seg-modal-loading');
+        if (loadingEl) loadingEl.style.display = 'none';
+        const targetEl = document.getElementById('seg-modal-waveform-target');
+        if (targetEl) targetEl.style.display = 'block';
         const segments = med.segments || [];
         if (segments && segments.length > 0) {
             segRegionsPlugin.clearRegions();
@@ -2358,6 +2806,14 @@ function closeSegmentBoundaryModal() {
     currentBoundaryMedia = null;
     currentBoundaryChannel = null;
     isBoundaryRegionPlaying = false;
+    currentBoundaryPrevSeg = null;
+    currentBoundaryNextSeg = null;
+    currentBoundaryPrevRegion = null;
+    currentBoundaryNextRegion = null;
+    isBoundaryPrevContiguous = false;
+    isBoundaryNextContiguous = false;
+    modifiedPrevEnd = null;
+    modifiedNextStart = null;
 }
 
 function openSegmentBoundaryModal(seg, activeMedia, ch) {
@@ -2396,6 +2852,49 @@ function openSegmentBoundaryModal(seg, activeMedia, ch) {
     const segEnd = (seg.end_time !== undefined && seg.end_time !== null) ? Number(seg.end_time) : (segStart + 5);
     updateBoundaryDisplays(segStart, segEnd);
 
+    // Contiguous segment detection (Snap / Contiguity)
+    const allSegments = (activeMedia.segments || []).filter(s => 
+        s.start_time !== undefined && s.start_time !== null &&
+        s.end_time !== undefined && s.end_time !== null &&
+        !isNaN(Number(s.start_time)) && !isNaN(Number(s.end_time))
+    ).sort((a, b) => Number(a.start_time) - Number(b.start_time));
+
+    const currentIndex = allSegments.findIndex(s => String(s.id) === String(seg.id));
+    currentBoundaryPrevSeg = currentIndex > 0 ? allSegments[currentIndex - 1] : null;
+    currentBoundaryNextSeg = (currentIndex >= 0 && currentIndex < allSegments.length - 1) ? allSegments[currentIndex + 1] : null;
+
+    isBoundaryPrevContiguous = false;
+    isBoundaryNextContiguous = false;
+    modifiedPrevEnd = null;
+    modifiedNextStart = null;
+
+    if (currentBoundaryPrevSeg) {
+        const prevEnd = Number(currentBoundaryPrevSeg.end_time);
+        if (Math.abs(prevEnd - segStart) <= CONTIGUOUS_BOUNDARY_THRESHOLD_SEC) {
+            isBoundaryPrevContiguous = true;
+        }
+    }
+
+    if (currentBoundaryNextSeg) {
+        const nextStart = Number(currentBoundaryNextSeg.start_time);
+        if (Math.abs(nextStart - segEnd) <= CONTIGUOUS_BOUNDARY_THRESHOLD_SEC) {
+            isBoundaryNextContiguous = true;
+        }
+    }
+
+    const contigBadge = document.getElementById('boundary-contiguous-badge');
+    if (contigBadge) {
+        if (isBoundaryPrevContiguous || isBoundaryNextContiguous) {
+            contigBadge.style.display = 'inline-flex';
+            const details = [];
+            if (isBoundaryPrevContiguous) details.push(`con #${currentBoundaryPrevSeg.json_segment_id || currentBoundaryPrevSeg.id}`);
+            if (isBoundaryNextContiguous) details.push(`con #${currentBoundaryNextSeg.json_segment_id || currentBoundaryNextSeg.id}`);
+            contigBadge.title = `Segmento contiguo ${details.join(' y ')} (umbral: ${CONTIGUOUS_BOUNDARY_THRESHOLD_MS}ms)`;
+        } else {
+            contigBadge.style.display = 'none';
+        }
+    }
+
     // Reset buttons
     const playSegBtn = document.getElementById('boundary-play-btn');
     if (playSegBtn) playSegBtn.innerHTML = '▶ Reproducir Segmento';
@@ -2417,7 +2916,20 @@ function openSegmentBoundaryModal(seg, activeMedia, ch) {
     }
 
     const container = document.getElementById('boundary-waveform-container');
-    if (container) container.innerHTML = '';
+    if (container) {
+        container.innerHTML = `
+            <div id="boundary-modal-loading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 140px; color: var(--ft-ink-muted); gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px;">
+                    <span class="waveform-loading-spinner"></span>
+                    <span id="boundary-modal-loading-text">Cargando audio... <strong id="boundary-modal-loading-progress" style="color: var(--ft-claret);">0%</strong></span>
+                </div>
+                <div id="boundary-modal-loading-bar-bg" style="width: 220px; height: 6px; background: #e5e0d8; border-radius: 3px; overflow: hidden;">
+                    <div id="boundary-modal-loading-bar-fill" style="width: 0%; height: 100%; background: var(--ft-claret); transition: width 0.15s ease;"></div>
+                </div>
+            </div>
+            <div id="boundary-modal-waveform-target" style="display: none; width: 100%;"></div>
+        `;
+    }
 
     // Calculate zoom level to show segment + margin
     const segDuration = Math.max(0.1, segEnd - segStart);
@@ -2439,37 +2951,94 @@ function openSegmentBoundaryModal(seg, activeMedia, ch) {
     const audioUrl = `/uploads/${activeMedia.filename}`;
 
     boundaryWaveSurfer = WaveSurfer.create({
-        container: '#boundary-waveform-container',
+        container: '#boundary-modal-waveform-target',
         waveColor: '#d7cbb9',
         progressColor: '#990F3D',
         height: 140,
         minPxPerSec: targetPxPerSec,
+        autoCenter: false,
+        autoScroll: true,
         url: audioUrl,
         plugins: [boundaryRegionsPlugin]
     });
 
+    boundaryWaveSurfer.on('loading', (percent) => {
+        const progEl = document.getElementById('boundary-modal-loading-progress');
+        if (progEl) progEl.innerText = `${percent}%`;
+        const barFill = document.getElementById('boundary-modal-loading-bar-fill');
+        if (barFill) barFill.style.width = `${percent}%`;
+    });
+
+    boundaryWaveSurfer.on('decode', () => {
+        const textEl = document.getElementById('boundary-modal-loading-text');
+        if (textEl) textEl.innerHTML = 'Decodificando forma de onda...';
+    });
+
+    boundaryWaveSurfer.on('error', (err) => {
+        console.error('Error cargando audio en boundaryWaveSurfer:', err);
+        const container = document.getElementById('boundary-waveform-container');
+        if (container) {
+            container.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 140px; color: #991b1b; background: #fee2e2; border: 1.5px solid #f87171; padding: 12px; border-radius: 4px; gap: 6px; font-size: 12px; text-align: center;">
+                    <strong>⚠️ Error al procesar el archivo de audio</strong>
+                    <span>No se pudo decodificar "${activeMedia.filename}". El navegador puede tener dificultades con archivos de alta frecuencia (como 96kHz PCM).</span>
+                </div>
+            `;
+        }
+    });
+
     boundaryWaveSurfer.on('ready', () => {
+        const loadingEl = document.getElementById('boundary-modal-loading');
+        if (loadingEl) loadingEl.style.display = 'none';
+        const targetEl = document.getElementById('boundary-modal-waveform-target');
+        if (targetEl) targetEl.style.display = 'block';
         try {
             boundaryWaveSurfer.zoom(targetPxPerSec);
         } catch (e) {}
 
+        // Set playhead at start of segment
+        try {
+            boundaryWaveSurfer.setTime(segStart);
+        } catch (e) {}
+
         boundaryRegionsPlugin.clearRegions();
+        currentBoundaryPrevRegion = null;
+        currentBoundaryNextRegion = null;
 
         // 1. Add other segments as context (light, non-draggable/non-resizable)
-        const allSegments = (activeMedia.segments || []);
-        allSegments.forEach((s, idx) => {
+        allSegments.forEach((s) => {
             if (String(s.id) === String(seg.id)) return;
-            const sStart = (s.start_time !== undefined && s.start_time !== null) ? Number(s.start_time) : null;
-            const sEnd = (s.end_time !== undefined && s.end_time !== null) ? Number(s.end_time) : null;
-            if (sStart !== null && sEnd !== null && isFinite(sStart) && isFinite(sEnd) && sEnd > sStart) {
-                boundaryRegionsPlugin.addRegion({
+            const sStart = Number(s.start_time);
+            const sEnd = Number(s.end_time);
+            if (isFinite(sStart) && isFinite(sEnd) && sEnd > sStart) {
+                const isContigPrev = isBoundaryPrevContiguous && currentBoundaryPrevSeg && String(s.id) === String(currentBoundaryPrevSeg.id);
+                const isContigNext = isBoundaryNextContiguous && currentBoundaryNextSeg && String(s.id) === String(currentBoundaryNextSeg.id);
+
+                let regColor = 'rgba(120, 110, 100, 0.12)';
+                let regContent = `Seg #${s.json_segment_id || s.id}`;
+
+                if (isContigPrev || isContigNext) {
+                    regColor = 'rgba(13, 148, 136, 0.18)'; // Teal tint to highlight contiguous neighbor
+                    regContent = `🔗 #${s.json_segment_id || s.id}`;
+                }
+
+                const reg = boundaryRegionsPlugin.addRegion({
+                    id: `boundary-context-seg-${s.id}`,
                     start: sStart,
                     end: sEnd,
-                    content: `Seg #${s.json_segment_id || (idx + 1)}`,
-                    color: 'rgba(120, 110, 100, 0.12)',
+                    content: regContent,
+                    color: regColor,
                     drag: false,
                     resize: false
                 });
+
+                if (reg && reg.element) {
+                    // Prevent context regions from blocking mouse events/handles of the target segment
+                    reg.element.style.pointerEvents = 'none';
+                }
+
+                if (isContigPrev) currentBoundaryPrevRegion = reg;
+                if (isContigNext) currentBoundaryNextRegion = reg;
             }
         });
 
@@ -2484,27 +3053,39 @@ function openSegmentBoundaryModal(seg, activeMedia, ch) {
             resize: true
         });
 
+        if (currentBoundaryRegion && currentBoundaryRegion.element) {
+            currentBoundaryRegion.element.style.zIndex = '20';
+        }
+
         currentBoundaryRegion.on('update', () => {
             updateBoundaryDisplays(currentBoundaryRegion.start, currentBoundaryRegion.end);
+            syncContiguousBoundaries();
         });
         currentBoundaryRegion.on('update-end', () => {
             updateBoundaryDisplays(currentBoundaryRegion.start, currentBoundaryRegion.end);
+            syncContiguousBoundaries();
         });
 
-        // Scroll to center the segment in the wrapper
+        // Center waveform viewport directly on the segment
+        centerBoundaryWaveformOnSegment(targetPxPerSec);
+        requestAnimationFrame(() => {
+            centerBoundaryWaveformOnSegment(targetPxPerSec);
+        });
         setTimeout(() => {
-            if (wrapper) {
-                const centerTime = (segStart + segEnd) / 2;
-                const centerPx = centerTime * targetPxPerSec;
-                const scrollPos = Math.max(0, centerPx - (wrapper.clientWidth / 2));
-                wrapper.scrollLeft = scrollPos;
-            }
-        }, 60);
+            centerBoundaryWaveformOnSegment(targetPxPerSec);
+        }, 50);
+        setTimeout(() => {
+            centerBoundaryWaveformOnSegment(targetPxPerSec);
+        }, 150);
+        setTimeout(() => {
+            centerBoundaryWaveformOnSegment(targetPxPerSec);
+        }, 300);
     });
 
     boundaryRegionsPlugin.on('region-updated', (reg) => {
         if (currentBoundaryRegion && reg.id === currentBoundaryRegion.id) {
             updateBoundaryDisplays(reg.start, reg.end);
+            syncContiguousBoundaries();
         }
     });
 
