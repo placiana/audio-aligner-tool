@@ -511,7 +511,7 @@ function setupV2EventListeners() {
         document.getElementById('add-media-modal').style.display = 'none';
     });
 
-    document.getElementById('add-media-form')?.addEventListener('submit', async (e) => {
+    document.getElementById('add-media-form')?.addEventListener('submit', (e) => {
         e.preventDefault();
         const channelId = document.getElementById('add-media-channel-id').value;
         const fileInput = document.getElementById('media-file');
@@ -522,25 +522,83 @@ function setupV2EventListeners() {
         }
 
         const formData = new FormData();
+        let totalBytes = 0;
         for (let i = 0; i < fileInput.files.length; i++) {
             formData.append('media_files', fileInput.files[i]);
+            totalBytes += fileInput.files[i].size || 0;
         }
 
-        try {
-            const response = await fetch(`/api/v2/channel/${channelId}/add_media`, {
-                method: 'POST',
-                body: formData
-            });
-            const data = await response.json();
-            if (data.success) {
-                document.getElementById('add-media-modal').style.display = 'none';
-                refreshV2Data();
-            } else {
-                alert('Error al agregar media: ' + (data.error || ''));
-            }
-        } catch (err) {
-            alert('Error en la solicitud: ' + err.message);
+        const submitBtn = document.getElementById('add-media-submit-btn');
+        const statusBox = document.getElementById('add-media-upload-status');
+        const statusText = document.getElementById('add-media-status-text');
+        const percentEl = document.getElementById('add-media-progress-percent');
+        const progressBar = document.getElementById('add-media-progress-bar');
+        const subtext = document.getElementById('add-media-status-subtext');
+
+        // Formatear tamaño
+        const sizeMb = (totalBytes / (1024 * 1024)).toFixed(1);
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.style.opacity = '0.6';
+            submitBtn.innerHTML = '⏳ Subiendo y procesando...';
         }
+        if (statusBox) statusBox.style.display = 'flex';
+        if (statusText) statusText.innerText = `Subiendo ${sizeMb} MB...`;
+        if (percentEl) percentEl.innerText = '0%';
+        if (progressBar) progressBar.style.width = '0%';
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/api/v2/channel/${channelId}/add_media`);
+
+        xhr.upload.onprogress = (evt) => {
+            if (evt.lengthComputable) {
+                const percent = Math.round((evt.loaded / evt.total) * 100);
+                if (percentEl) percentEl.innerText = `${percent}%`;
+                if (progressBar) progressBar.style.width = `${percent}%`;
+                if (percent >= 100) {
+                    if (statusText) statusText.innerText = 'Procesando en el servidor...';
+                    if (subtext) subtext.innerText = 'Generando versión web compatible (FFmpeg), por favor espera...';
+                } else {
+                    if (statusText) statusText.innerText = `Subiendo archivo(s) (${percent}% de ${sizeMb} MB)...`;
+                }
+            }
+        };
+
+        xhr.onload = () => {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.innerHTML = '📤 Subir archivo(s)';
+            }
+            try {
+                const data = JSON.parse(xhr.responseText);
+                if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+                    if (statusBox) statusBox.style.display = 'none';
+                    document.getElementById('add-media-modal').style.display = 'none';
+                    fileInput.value = '';
+                    refreshV2Data();
+                } else {
+                    alert('Error al agregar media: ' + (data.error || xhr.statusText));
+                    if (statusBox) statusBox.style.display = 'none';
+                }
+            } catch (err) {
+                alert('Error al procesar la respuesta del servidor: ' + err.message);
+                if (statusBox) statusBox.style.display = 'none';
+            }
+        };
+
+        xhr.onerror = () => {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.innerHTML = '📤 Subir archivo(s)';
+            }
+            alert('Error de red durante la subida del archivo.');
+            if (statusBox) statusBox.style.display = 'none';
+        };
+
+        xhr.send(formData);
     });
 
     // Text Media Modal Handlers
@@ -610,7 +668,7 @@ function setupV2EventListeners() {
         }
     });
 
-    document.getElementById('add-text-media-form')?.addEventListener('submit', async (e) => {
+    document.getElementById('add-text-media-form')?.addEventListener('submit', (e) => {
         e.preventDefault();
         const channelId = document.getElementById('add-text-media-channel-id').value;
         const selectedType = document.getElementById('add-text-media-selected-type').value;
@@ -620,6 +678,25 @@ function setupV2EventListeners() {
             alert('Por favor selecciona al menos un archivo.');
             return;
         }
+
+        const submitBtn = document.getElementById('add-text-media-submit-btn');
+        const statusBox = document.getElementById('add-text-media-upload-status');
+        const statusText = document.getElementById('add-text-media-status-text');
+        const percentEl = document.getElementById('add-text-media-progress-percent');
+        const progressBar = document.getElementById('add-text-media-progress-bar');
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.style.opacity = '0.6';
+            submitBtn.innerHTML = '⏳ Procesando...';
+        }
+        if (statusBox) statusBox.style.display = 'flex';
+        if (statusText) statusText.innerText = 'Subiendo archivo...';
+        if (percentEl) percentEl.innerText = '0%';
+        if (progressBar) progressBar.style.width = '0%';
+
+        let url = '';
+        const formData = new FormData();
 
         if (selectedType === 'csv') {
             const columnMappings = {};
@@ -634,52 +711,75 @@ function setupV2EventListeners() {
 
             if (Object.keys(columnMappings).length === 0) {
                 alert('Por favor asigna al menos una columna a un canal de texto.');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.style.opacity = '1';
+                    submitBtn.innerHTML = '📤 Confirmar y Subir';
+                }
+                if (statusBox) statusBox.style.display = 'none';
                 return;
             }
 
-            const formData = new FormData();
             formData.append('media_files', fileInput.files[0]);
             formData.append('column_mappings', JSON.stringify(columnMappings));
             formData.append('delimiter', document.getElementById('csv-delimiter-input')?.value || ',');
-
-            try {
-                const response = await fetch(`/api/v2/project/${v2ProjectId}/import_tabular_media`, {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
-                if (data.success) {
-                    document.getElementById('add-text-media-modal').style.display = 'none';
-                    refreshV2Data();
-                } else {
-                    alert('Error al importar archivo CSV: ' + (data.error || ''));
-                }
-            } catch (err) {
-                alert('Error en la solicitud: ' + err.message);
-            }
+            url = `/api/v2/project/${v2ProjectId}/import_tabular_media`;
         } else {
-            const formData = new FormData();
             for (let i = 0; i < fileInput.files.length; i++) {
                 formData.append('media_files', fileInput.files[i]);
             }
             formData.append('media_type', selectedType);
+            url = `/api/v2/channel/${channelId}/add_media`;
+        }
 
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+
+        xhr.upload.onprogress = (evt) => {
+            if (evt.lengthComputable) {
+                const percent = Math.round((evt.loaded / evt.total) * 100);
+                if (percentEl) percentEl.innerText = `${percent}%`;
+                if (progressBar) progressBar.style.width = `${percent}%`;
+                if (percent >= 100) {
+                    if (statusText) statusText.innerText = 'Procesando texto en el servidor...';
+                }
+            }
+        };
+
+        xhr.onload = () => {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.innerHTML = '📤 Confirmar y Subir';
+            }
             try {
-                const response = await fetch(`/api/v2/channel/${channelId}/add_media`, {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
-                if (data.success) {
+                const data = JSON.parse(xhr.responseText);
+                if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+                    if (statusBox) statusBox.style.display = 'none';
                     document.getElementById('add-text-media-modal').style.display = 'none';
+                    fileInput.value = '';
                     refreshV2Data();
                 } else {
-                    alert('Error al agregar media de texto: ' + (data.error || ''));
+                    alert('Error al procesar archivo: ' + (data.error || xhr.statusText));
+                    if (statusBox) statusBox.style.display = 'none';
                 }
             } catch (err) {
-                alert('Error en la solicitud: ' + err.message);
+                alert('Error al procesar respuesta: ' + err.message);
+                if (statusBox) statusBox.style.display = 'none';
             }
-        }
+        };
+
+        xhr.onerror = () => {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.innerHTML = '📤 Confirmar y Subir';
+            }
+            alert('Error de red durante la subida del archivo.');
+            if (statusBox) statusBox.style.display = 'none';
+        };
+
+        xhr.send(formData);
     });
 
     document.getElementById('close-audio-modal-btn')?.addEventListener('click', () => {

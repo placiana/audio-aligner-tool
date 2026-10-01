@@ -121,7 +121,23 @@
                 <div style="font-size: 11px; color: var(--ft-ink-muted);">Puedes seleccionar uno o varios archivos simultáneamente. Formatos: Audio (.mp3, .wav, .ogg, .m4a), Texto (.txt, .json)</div>
             </div>
 
-            <button type="submit" class="ft-button" style="width: 100%; margin-top: 10px;">
+            <div id="add-media-upload-status" style="display: none; flex-direction: column; gap: 8px; background: #faf9f7; border: 1px solid var(--ft-border); padding: 12px; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="waveform-loading-spinner" style="width: 14px; height: 14px; border-width: 2px;"></span>
+                        <span id="add-media-status-text" style="color: var(--ft-claret-dark);">Subiendo archivo...</span>
+                    </div>
+                    <span id="add-media-progress-percent" style="color: var(--ft-claret); font-family: monospace;">0%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: #e5e0d8; border-radius: 3px; overflow: hidden;">
+                    <div id="add-media-progress-bar" style="width: 0%; height: 100%; background: var(--ft-claret); transition: width 0.15s ease;"></div>
+                </div>
+                <div id="add-media-status-subtext" style="font-size: 11px; color: var(--ft-ink-muted);">
+                    Para archivos pesados o muestreos altos (WAV 96kHz), se generará automáticamente una versión web optimizada.
+                </div>
+            </div>
+
+            <button type="submit" id="add-media-submit-btn" class="ft-button" style="width: 100%; margin-top: 6px;">
                 📤 Subir archivo(s)
             </button>
         </form>
@@ -200,9 +216,22 @@
                     </div>
                 </div>
 
+                <div id="add-text-media-upload-status" style="display: none; flex-direction: column; gap: 8px; background: #faf9f7; border: 1px solid var(--ft-border); padding: 12px; border-radius: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="waveform-loading-spinner" style="width: 14px; height: 14px; border-width: 2px;"></span>
+                            <span id="add-text-media-status-text" style="color: var(--ft-claret-dark);">Procesando archivo...</span>
+                        </div>
+                        <span id="add-text-media-progress-percent" style="color: var(--ft-claret); font-family: monospace;">0%</span>
+                    </div>
+                    <div style="width: 100%; height: 6px; background: #e5e0d8; border-radius: 3px; overflow: hidden;">
+                        <div id="add-text-media-progress-bar" style="width: 0%; height: 100%; background: var(--ft-claret); transition: width 0.15s ease;"></div>
+                    </div>
+                </div>
+
                 <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
                     <button type="button" id="cancel-add-text-media-btn" class="ft-button secondary">Cancelar</button>
-                    <button type="submit" class="ft-button primary">📤 Confirmar y Subir</button>
+                    <button type="submit" id="add-text-media-submit-btn" class="ft-button primary">📤 Confirmar y Subir</button>
                 </div>
             </form>
         </div>
