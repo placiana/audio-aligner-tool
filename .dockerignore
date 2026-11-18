@@ -1,0 +1,36 @@
+# Entornos virtuales de Python
+venv/
+.venv/
+env/
+
+# Base de datos y archivos subidos (se gestionan vía volúmenes de Docker)
+db/
+*.db
+uploads/
+
+# Secretos y credenciales locales
+.env
+.env.*
+*.pub
+*.pem
+*.key
+
+# Control de versiones
+.git/
+.gitignore
+
+# Cachés y temporales de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Archivos de datos brutos gigantes que no usa la app web en tiempo de ejecución
+processed_data.json
+
+# IDEs y editores
+.idea/
+.vscode/
+.antigravitycli/
+*.swp

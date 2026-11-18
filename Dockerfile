@@ -19,6 +19,9 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Crear directorios donde se montarán los volúmenes
+RUN mkdir -p /app/uploads /app/db
+
 # Copy application code
 COPY . .
 
@@ -28,6 +31,7 @@ EXPOSE 5000
 # Set environment variables
 ENV FLASK_APP=app.py
 ENV FLASK_RUN_HOST=0.0.0.0
+ENV PYTHONUNBUFFERED=1
 
 # Start Flask application
 CMD ["python", "app.py"]
